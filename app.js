@@ -200,8 +200,13 @@ function adminAddSale() {
     const person = document.getElementById('adminPerson').value;
     const amount = parseInt(document.getElementById('adminAmount').value);
     if (person && amount) {
-        data.sales[person] += amount;
-        saveData();
+        if (data.stock[person] >= amount) {
+            data.sales[person] += amount;
+            data.stock[person] -= amount;
+            saveData();
+        } else {
+            alert('Nicht genügend Lagerbestand!');
+        }
     }
 }
 
@@ -211,6 +216,7 @@ function adminRemoveSale() {
     const amount = parseInt(document.getElementById('adminAmount').value);
     if (person && amount && data.sales[person] >= amount) {
         data.sales[person] -= amount;
+        data.stock[person] += amount;
         saveData();
     }
 }
@@ -220,8 +226,13 @@ function adminAddConsumption() {
     const person = document.getElementById('adminPerson').value;
     const amount = parseInt(document.getElementById('adminAmount').value);
     if (person && amount) {
-        data.consumed[person] += amount;
-        saveData();
+        if (data.stock[person] >= amount) {
+            data.consumed[person] += amount;
+            data.stock[person] -= amount;
+            saveData();
+        } else {
+            alert('Nicht genügend Lagerbestand!');
+        }
     }
 }
 
@@ -231,6 +242,7 @@ function adminRemoveConsumption() {
     const amount = parseInt(document.getElementById('adminAmount').value);
     if (person && amount && data.consumed[person] >= amount) {
         data.consumed[person] -= amount;
+        data.stock[person] += amount;
         saveData();
     }
 }
