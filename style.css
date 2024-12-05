@@ -56,10 +56,6 @@ button.delete {
     background-color: var(--danger);
 }
 
-button.load {
-    background-color: var(--secondary);
-}
-
 #loginSection {
     position: fixed;
     top: 0;
@@ -131,7 +127,7 @@ textarea {
     }
 
     textarea {
-        width: calc(25% - 20px);
+        width: calc(16.66% - 20px);
         margin: 10px;
     }
 
