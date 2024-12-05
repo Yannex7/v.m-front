@@ -11,7 +11,8 @@ let data = {
     sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
     consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
     payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-    totalQuantity: 0
+    totalQuantity: 0,
+    logs: []
 };
 
 async function loadData() {
@@ -23,23 +24,31 @@ async function loadData() {
             sales: serverData.sales || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
             consumed: serverData.consumed || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
             payments: serverData.payments || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            totalQuantity: serverData.totalQuantity || 0
+            totalQuantity: serverData.totalQuantity || 0,
+            logs: serverData.logs || []
         };
         updateDisplay();
     } catch (error) {
         console.error('Fehler beim Laden:', error);
-        data = {
-            stock: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            totalQuantity: 0
-        };
         updateDisplay();
     }
 }
 
 loadData();
+
+function addLog(action, details) {
+    const timestamp = new Date().toLocaleString();
+    const logEntry = `${timestamp} - ${currentUser.username}: ${action} - ${details}`;
+    data.logs.unshift(logEntry);
+    if (data.logs.length > 100) data.logs.pop();
+    updateLogDisplay();
+}
+
+function updateLogDisplay() {
+    if (currentUser && currentUser.logAccess) {
+        document.getElementById('logOverview').value = data.logs.join('\n');
+    }
+}
 
 function decryptCredentials() {
     const decrypted = CryptoJS.AES.decrypt(encryptedCredentials, "vapeSecretKey").toString(CryptoJS.enc.Utf8);
@@ -54,8 +63,11 @@ function login() {
     if (users[username] && users[username].password === password) {
         currentUser = {
             username: username,
-            isAdmin: username === 'admin'
+            isAdmin: users[username].isAdmin,
+            stockAdmin: users[username].stockAdmin,
+            logAccess: users[username].logAccess
         };
+        addLog('Login', 'Erfolgreich eingeloggt');
         handleLoginSuccess();
     } else {
         alert('Falscher Benutzername oder Passwort!');
@@ -70,13 +82,23 @@ function handleLoginSuccess() {
     document.querySelectorAll('.admin-only').forEach(el => {
         el.style.display = currentUser.isAdmin ? 'block' : 'none';
     });
+    
+    document.querySelectorAll('.stock-admin-only').forEach(el => {
+        el.style.display = currentUser.stockAdmin ? 'block' : 'none';
+    });
+    
+    document.querySelector('.log-section').style.display = 
+        currentUser.logAccess ? 'block' : 'none';
+    
     document.querySelector('.runner-section').style.display = 
-        currentUser.isAdmin ? 'none' : 'block';
+        (!currentUser.isAdmin && !currentUser.stockAdmin) ? 'block' : 'none';
     
     updateDisplay();
+    updateLogDisplay();
 }
 
 function logout() {
+    addLog('Logout', 'Ausgeloggt');
     currentUser = null;
     location.reload();
 }
@@ -91,6 +113,7 @@ async function saveData() {
             body: JSON.stringify(data)
         });
         updateDisplay();
+        updateLogDisplay();
     } catch (error) {
         console.error('Fehler beim Speichern:', error);
     }
@@ -109,15 +132,20 @@ function updateDisplay() {
         `Gesamtgewinn: ${totals.totalGewinn.toFixed(2)}€`;
     
     ['robin', 'robink', 'adrian', 'andreas', 'martin'].forEach(person => {
-        const owed = calculateOwed(person);
-        const displayName = person === 'robink' ? 'ROBIN.K' : person.toUpperCase();
-        document.getElementById(`${person}Overview`).value = 
-            `${displayName}:\n` +
-            `Lager: ${data.stock[person]}\n` +
-            `Verkäufe: ${data.sales[person]}\n` +
-            `Eigenkonsum: ${data.consumed[person]}\n` +
-            `Gezahlt: ${data.payments[person]}€\n` +
-            `Noch zu zahlen: ${owed.toFixed(2)}€`;
+        if (currentUser.isAdmin || currentUser.stockAdmin || currentUser.username === person) {
+            const owed = calculateOwed(person);
+            const displayName = person === 'robink' ? 'ROBIN.K' : person.toUpperCase();
+            document.getElementById(`${person}Overview`).value = 
+                `${displayName}:\n` +
+                `Lager: ${data.stock[person]}\n` +
+                `Verkäufe: ${data.sales[person]}\n` +
+                `Eigenkonsum: ${data.consumed[person]}\n` +
+                `Gezahlt: ${data.payments[person]}€\n` +
+                `Noch zu zahlen: ${owed.toFixed(2)}€`;
+            document.getElementById(`${person}Overview`).style.display = 'block';
+        } else {
+            document.getElementById(`${person}Overview`).style.display = 'none';
+        }
     });
 }
 
@@ -154,6 +182,7 @@ function runnerAddSale() {
         if (data.stock[currentUser.username] >= amount) {
             data.sales[currentUser.username] += amount;
             data.stock[currentUser.username] -= amount;
+            addLog('Verkauf', `${amount} Stück verkauft`);
             saveData();
         } else {
             alert('Nicht genügend Lagerbestand!');
@@ -168,10 +197,22 @@ function runnerAddConsumption() {
         if (data.stock[currentUser.username] >= amount) {
             data.consumed[currentUser.username] += amount;
             data.stock[currentUser.username] -= amount;
+            addLog('Eigenkonsum', `${amount} Stück`);
             saveData();
         } else {
             alert('Nicht genügend Lagerbestand!');
         }
+    }
+}
+
+function stockAdminAdd() {
+    if (!currentUser.stockAdmin) return;
+    const person = document.getElementById('stockPerson').value;
+    const amount = parseInt(document.getElementById('stockAmount').value);
+    if (person && amount) {
+        data.stock[person] += amount;
+        addLog('Lager+', `${amount} zu ${person} hinzugefügt`);
+        saveData();
     }
 }
 
@@ -180,6 +221,7 @@ function setTotalQuantity() {
     const amount = parseInt(document.getElementById('totalQuantity').value);
     if (amount >= 0) {
         data.totalQuantity = amount;
+        addLog('Gesamtanzahl', `Auf ${amount} gesetzt`);
         saveData();
     }
 }
@@ -190,6 +232,7 @@ function adminAddStock() {
     const amount = parseInt(document.getElementById('adminAmount').value);
     if (person && amount) {
         data.stock[person] += amount;
+        addLog('Admin Lager+', `${amount} zu ${person}`);
         saveData();
     }
 }
@@ -200,6 +243,7 @@ function adminRemoveStock() {
     const amount = parseInt(document.getElementById('adminAmount').value);
     if (person && amount && data.stock[person] >= amount) {
         data.stock[person] -= amount;
+        addLog('Admin Lager-', `${amount} von ${person}`);
         saveData();
     }
 }
@@ -212,6 +256,7 @@ function adminAddSale() {
         if (data.stock[person] >= amount) {
             data.sales[person] += amount;
             data.stock[person] -= amount;
+            addLog('Admin Verkauf+', `${amount} für ${person}`);
             saveData();
         } else {
             alert('Nicht genügend Lagerbestand!');
@@ -226,6 +271,7 @@ function adminRemoveSale() {
     if (person && amount && data.sales[person] >= amount) {
         data.sales[person] -= amount;
         data.stock[person] += amount;
+        addLog('Admin Verkauf-', `${amount} von ${person}`);
         saveData();
     }
 }
@@ -238,6 +284,7 @@ function adminAddConsumption() {
         if (data.stock[person] >= amount) {
             data.consumed[person] += amount;
             data.stock[person] -= amount;
+            addLog('Admin Eigenkonsum+', `${amount} für ${person}`);
             saveData();
         } else {
             alert('Nicht genügend Lagerbestand!');
@@ -252,6 +299,7 @@ function adminRemoveConsumption() {
     if (person && amount && data.consumed[person] >= amount) {
         data.consumed[person] -= amount;
         data.stock[person] += amount;
+        addLog('Admin Eigenkonsum-', `${amount} von ${person}`);
         saveData();
     }
 }
@@ -262,6 +310,7 @@ function adminAddPayment() {
     const amount = parseFloat(document.getElementById('adminPayment').value);
     if (person && amount) {
         data.payments[person] += amount;
+        addLog('Admin Zahlung+', `${amount}€ von ${person}`);
         saveData();
     }
 }
@@ -272,6 +321,7 @@ function adminRemovePayment() {
     const amount = parseFloat(document.getElementById('adminPayment').value);
     if (person && amount && data.payments[person] >= amount) {
         data.payments[person] -= amount;
+        addLog('Admin Zahlung-', `${amount}€ von ${person}`);
         saveData();
     }
 }
@@ -284,8 +334,10 @@ function adminResetAll() {
             sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
             consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
             payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            totalQuantity: 0
+            totalQuantity: 0,
+            logs: []
         };
+        addLog('Reset', 'Alle Daten zurückgesetzt');
         saveData();
     }
 }
