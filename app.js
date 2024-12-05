@@ -35,12 +35,21 @@ async function loadData() {
 }
 
 loadData();
+checkLoginStatus(); // Prüfe Login-Status nach dem Laden
+
+function checkLoginStatus() {
+    const loginData = JSON.parse(localStorage.getItem('vapeLoginData'));
+    if (loginData && loginData.expiry > new Date().getTime()) {
+        currentUser = loginData.user;
+        handleLoginSuccess();
+    }
+}
 
 function addLog(action, details) {
     const timestamp = new Date().toLocaleString();
     const logEntry = `${timestamp} - ${currentUser.username}: ${action} - ${details}`;
     data.logs.unshift(logEntry);
-    if (data.logs.length > 100) data.logs.pop();
+    if (data.logs.length > 50) data.logs.pop();
     updateLogDisplay();
 }
 
@@ -67,6 +76,14 @@ function login() {
             stockAdmin: users[username].stockAdmin,
             logAccess: users[username].logAccess
         };
+        
+        // Speichere Login für 24 Stunden
+        const loginData = {
+            user: currentUser,
+            expiry: new Date().getTime() + (24 * 60 * 60 * 1000)
+        };
+        localStorage.setItem('vapeLoginData', JSON.stringify(loginData));
+        
         addLog('Login', 'Erfolgreich eingeloggt');
         handleLoginSuccess();
     } else {
@@ -98,6 +115,7 @@ function handleLoginSuccess() {
 }
 
 function logout() {
+    localStorage.removeItem('vapeLoginData');
     addLog('Logout', 'Ausgeloggt');
     currentUser = null;
     location.reload();
