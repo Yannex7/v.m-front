@@ -6,6 +6,7 @@
     <title>Vape Management</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div id="loginSection">
@@ -19,7 +20,7 @@
         </div>
     </div>
 
-    <div class="content-wrapper" style="display: none;">
+    <div class="content-wrapper">
         <button onclick="logout()" class="logout-btn">Ausloggen</button>
 
         <div class="section admin-only">
@@ -46,35 +47,18 @@
                 <button onclick="adminAddPayment()">Zahlung +</button>
                 <button onclick="adminRemovePayment()">Zahlung -</button>
             </div>
-            <div class="input-group">
-                <input type="number" id="totalQuantity" placeholder="Gesamtanzahl">
-                <button onclick="setTotalQuantity()">Gesamtanzahl festlegen</button>
-            </div>
             <button onclick="adminResetAll()" class="delete">Alles Zurücksetzen</button>
+            <button onclick="showStatistics()" class="load">Statistik anzeigen</button>
         </div>
 
-        <div class="section stock-admin-only">
-            <h2>Lager Verwaltung</h2>
-            <div class="input-group">
-                <select id="stockPerson">
-                    <option value="">Person wählen...</option>
-                    <option value="robin">Robin</option>
-                    <option value="robink">Robin.K</option>
-                    <option value="adrian">Adrian</option>
-                    <option value="andreas">Andreas</option>
-                    <option value="martin">Martin</option>
-                </select>
-                <input type="number" id="stockAmount" placeholder="Anzahl">
-                <button onclick="stockAdminAdd()">Lager +</button>
+        <div id="statisticsSection" class="section admin-only" style="display: none;">
+            <div class="chart-container">
+                <h3>Verkäufe & Eigenkonsum</h3>
+                <canvas id="salesChart"></canvas>
             </div>
-        </div>
-
-        <div class="section runner-section">
-            <h2>Runner Verwaltung</h2>
-            <div class="input-group">
-                <input type="number" id="runnerAmount" placeholder="Anzahl">
-                <button onclick="runnerAddSale()">Verkauf +</button>
-                <button onclick="runnerAddConsumption()">Eigenkonsum +</button>
+            <div class="chart-container">
+                <h3>Finanzübersicht</h3>
+                <canvas id="financeChart"></canvas>
             </div>
         </div>
 
@@ -89,7 +73,7 @@
         </div>
 
         <div class="section log-section">
-            <h2>System Log</h2>
+            <h2>Aktivitätsprotokoll</h2>
             <textarea id="logOverview" readonly></textarea>
         </div>
     </div>
