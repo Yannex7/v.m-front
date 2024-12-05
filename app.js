@@ -91,7 +91,7 @@ function handleLoginSuccess() {
         currentUser.logAccess ? 'block' : 'none';
     
     document.querySelector('.runner-section').style.display = 
-        (!currentUser.isAdmin && !currentUser.stockAdmin) ? 'block' : 'none';
+        !currentUser.isAdmin ? 'block' : 'none';
     
     updateDisplay();
     updateLogDisplay();
@@ -176,7 +176,6 @@ function calculateOwed(person) {
 }
 
 function runnerAddSale() {
-    if (currentUser.isAdmin) return;
     const amount = parseInt(document.getElementById('runnerAmount').value);
     if (amount && amount > 0) {
         if (data.stock[currentUser.username] >= amount) {
@@ -191,7 +190,6 @@ function runnerAddSale() {
 }
 
 function runnerAddConsumption() {
-    if (currentUser.isAdmin) return;
     const amount = parseInt(document.getElementById('runnerAmount').value);
     if (amount && amount > 0) {
         if (data.stock[currentUser.username] >= amount) {
