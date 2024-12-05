@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -5,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vape Management</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
@@ -32,6 +32,7 @@
                     <option value="robink">Robin.K</option>
                     <option value="adrian">Adrian</option>
                     <option value="andreas">Andreas</option>
+                    <option value="martin">Martin</option>
                 </select>
                 <input type="number" id="adminAmount" placeholder="Anzahl">
                 <button onclick="adminAddStock()">Lager +</button>
@@ -47,15 +48,14 @@
                 <button onclick="adminRemovePayment()">Zahlung -</button>
             </div>
             <div class="input-group">
-                <button onclick="exportData()" class="load">Daten exportieren</button>
-                <input type="file" id="importFile" accept=".json" style="display: none;">
-                <button onclick="document.getElementById('importFile').click()" class="load">Daten importieren</button>
+                <input type="number" id="totalQuantity" placeholder="Gesamtanzahl">
+                <button onclick="setTotalQuantity()">Gesamtanzahl festlegen</button>
             </div>
             <button onclick="adminResetAll()" class="delete">Alles Zurücksetzen</button>
         </div>
 
         <div class="section runner-section">
-            <h2>Eigene Verwaltung</h2>
+            <h2>Runner Verwaltung</h2>
             <div class="input-group">
                 <input type="number" id="runnerAmount" placeholder="Anzahl">
                 <button onclick="runnerAddSale()">Verkauf +</button>
@@ -70,6 +70,7 @@
             <textarea id="robinkOverview" readonly></textarea>
             <textarea id="adrianOverview" readonly></textarea>
             <textarea id="andreasOverview" readonly></textarea>
+            <textarea id="martinOverview" readonly></textarea>
         </div>
     </div>
 
