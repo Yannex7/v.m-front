@@ -35,7 +35,7 @@ async function loadData() {
 }
 
 loadData();
-checkLoginStatus(); // Prüfe Login-Status nach dem Laden
+checkLoginStatus();
 
 function checkLoginStatus() {
     const loginData = JSON.parse(localStorage.getItem('vapeLoginData'));
@@ -77,7 +77,6 @@ function login() {
             logAccess: users[username].logAccess
         };
         
-        // Speichere Login für 24 Stunden
         const loginData = {
             user: currentUser,
             expiry: new Date().getTime() + (24 * 60 * 60 * 1000)
@@ -107,9 +106,6 @@ function handleLoginSuccess() {
     document.querySelector('.log-section').style.display = 
         currentUser.logAccess ? 'block' : 'none';
     
-    document.querySelector('.runner-section').style.display = 
-        !currentUser.isAdmin ? 'block' : 'none';
-    
     updateDisplay();
     updateLogDisplay();
 }
@@ -134,6 +130,62 @@ async function saveData() {
         updateLogDisplay();
     } catch (error) {
         console.error('Fehler beim Speichern:', error);
+    }
+}
+
+function showStatistics() {
+    if (!currentUser.isAdmin) return;
+    
+    const statsSection = document.getElementById('statisticsSection');
+    
+    if (statsSection.style.display === 'none') {
+        statsSection.style.display = 'block';
+        
+        const salesChart = new Chart('salesChart', {
+            type: 'bar',
+            data: {
+                labels: ['ROBIN', 'ROBIN.K', 'ADRIAN', 'ANDREAS', 'MARTIN'],
+                datasets: [{
+                    label: 'Verkäufe',
+                    data: Object.values(data.sales),
+                    backgroundColor: '#4CAF50'
+                }, {
+                    label: 'Eigenkonsum',
+                    data: Object.values(data.consumed),
+                    backgroundColor: '#2196F3'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        
+        const totals = calculateTotals();
+        const financeChart = new Chart('financeChart', {
+            type: 'doughnut',
+            data: {
+                labels: ['Verkäufe', 'Eigenkonsum', 'Einkauf', 'Provision'],
+                datasets: [{
+                    data: [
+                        totals.totalSales,
+                        totals.totalEigenkonsum,
+                        totals.totalEinkauf,
+                        totals.totalProvisions
+                    ],
+                    backgroundColor: ['#4CAF50', '#2196F3', '#f44336', '#FFC107']
+                }]
+            },
+            options: {
+                responsive: true
+            }
+        });
+    } else {
+        statsSection.style.display = 'none';
     }
 }
 
@@ -193,55 +245,7 @@ function calculateOwed(person) {
     return salesDebt + eigenkonsum - data.payments[person];
 }
 
-function runnerAddSale() {
-    const amount = parseInt(document.getElementById('runnerAmount').value);
-    if (amount && amount > 0) {
-        if (data.stock[currentUser.username] >= amount) {
-            data.sales[currentUser.username] += amount;
-            data.stock[currentUser.username] -= amount;
-            addLog('Verkauf', `${amount} Stück verkauft`);
-            saveData();
-        } else {
-            alert('Nicht genügend Lagerbestand!');
-        }
-    }
-}
-
-function runnerAddConsumption() {
-    const amount = parseInt(document.getElementById('runnerAmount').value);
-    if (amount && amount > 0) {
-        if (data.stock[currentUser.username] >= amount) {
-            data.consumed[currentUser.username] += amount;
-            data.stock[currentUser.username] -= amount;
-            addLog('Eigenkonsum', `${amount} Stück`);
-            saveData();
-        } else {
-            alert('Nicht genügend Lagerbestand!');
-        }
-    }
-}
-
-function stockAdminAdd() {
-    if (!currentUser.stockAdmin) return;
-    const person = document.getElementById('stockPerson').value;
-    const amount = parseInt(document.getElementById('stockAmount').value);
-    if (person && amount) {
-        data.stock[person] += amount;
-        addLog('Lager+', `${amount} zu ${person} hinzugefügt`);
-        saveData();
-    }
-}
-
-function setTotalQuantity() {
-    if (!currentUser.isAdmin) return;
-    const amount = parseInt(document.getElementById('totalQuantity').value);
-    if (amount >= 0) {
-        data.totalQuantity = amount;
-        addLog('Gesamtanzahl', `Auf ${amount} gesetzt`);
-        saveData();
-    }
-}
-
+// Admin Funktionen
 function adminAddStock() {
     if (!currentUser.isAdmin) return;
     const person = document.getElementById('adminPerson').value;
