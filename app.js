@@ -137,6 +137,16 @@ async function saveData() {
     }
 }
 
+function updateTotalQuantity() {
+    if (!currentUser.isAdmin) return;
+    const amount = parseInt(document.getElementById('totalQuantityInput').value);
+    if (amount >= 0) {
+        data.totalQuantity = amount;
+        addLog('Gesamtanzahl Update', `Neue Gesamtanzahl: ${amount}`);
+        saveData();
+    }
+}
+
 function showStatistics() {
     if (!currentUser.isAdmin) return;
     
