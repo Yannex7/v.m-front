@@ -7,39 +7,38 @@ const PRICES = {
 
 let currentUser = null;
 let data = {
-    stock: { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-    sales: { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-    consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-    payments: { robin: 0, robink: 0, adrian: 0, andreas: 0 }
+    stock: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+    sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+    consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+    payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+    totalQuantity: 0
 };
 
-// Daten vom Server laden
 async function loadData() {
     try {
         const response = await fetch('https://v-m-259c.onrender.com/api/data');
         const serverData = await response.json();
-        // Sicherstellen dass die Datenstruktur existiert
         data = {
-            stock: serverData.stock || { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-            sales: serverData.sales || { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-            consumed: serverData.consumed || { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-            payments: serverData.payments || { robin: 0, robink: 0, adrian: 0, andreas: 0 }
+            stock: serverData.stock || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            sales: serverData.sales || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            consumed: serverData.consumed || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            payments: serverData.payments || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            totalQuantity: serverData.totalQuantity || 0
         };
         updateDisplay();
     } catch (error) {
         console.error('Fehler beim Laden:', error);
-        // Fallback auf Standarddaten bei Fehler
         data = {
-            stock: { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-            sales: { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-            consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-            payments: { robin: 0, robink: 0, adrian: 0, andreas: 0 }
+            stock: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            totalQuantity: 0
         };
         updateDisplay();
     }
 }
 
-// Beim Start Daten laden
 loadData();
 
 function decryptCredentials() {
@@ -102,13 +101,14 @@ function updateDisplay() {
     
     document.getElementById('totalOverview').value = 
         `GESAMTÜBERSICHT:\n` +
+        `Gesamtanzahl: ${data.totalQuantity}\n` +
         `Gesamtverkäufe: ${totals.totalSales.toFixed(2)}€\n` +
         `Eigenkonsum Einnahmen: ${totals.totalEigenkonsum.toFixed(2)}€\n` +
         `Einkaufskosten: ${totals.totalEinkauf.toFixed(2)}€\n` +
         `Provisionen: ${totals.totalProvisions.toFixed(2)}€\n` +
         `Gesamtgewinn: ${totals.totalGewinn.toFixed(2)}€`;
     
-    ['robin', 'robink', 'adrian', 'andreas'].forEach(person => {
+    ['robin', 'robink', 'adrian', 'andreas', 'martin'].forEach(person => {
         const owed = calculateOwed(person);
         const displayName = person === 'robink' ? 'ROBIN.K' : person.toUpperCase();
         document.getElementById(`${person}Overview`).value = 
@@ -172,6 +172,15 @@ function runnerAddConsumption() {
         } else {
             alert('Nicht genügend Lagerbestand!');
         }
+    }
+}
+
+function setTotalQuantity() {
+    if (!currentUser.isAdmin) return;
+    const amount = parseInt(document.getElementById('totalQuantity').value);
+    if (amount >= 0) {
+        data.totalQuantity = amount;
+        saveData();
     }
 }
 
@@ -271,42 +280,14 @@ function adminResetAll() {
     if (!currentUser.isAdmin) return;
     if (confirm('Wirklich alle Daten zurücksetzen?')) {
         data = {
-            stock: { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-            sales: { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-            consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0 },
-            payments: { robin: 0, robink: 0, adrian: 0, andreas: 0 }
+            stock: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            totalQuantity: 0
         };
         saveData();
     }
 }
-
-function exportData() {
-    if (!currentUser.isAdmin) return;
-    const dataStr = JSON.stringify(data);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const exportFileDefaultName = 'vape_data.json';
-
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-}
-
-document.getElementById('importFile').addEventListener('change', async function(e) {
-    if (!currentUser.isAdmin) return;
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const importedData = JSON.parse(e.target.result);
-            data = importedData;
-            await saveData();
-            alert('Daten erfolgreich importiert!');
-        } catch (error) {
-            alert('Fehler beim Importieren der Daten!');
-        }
-    };
-    reader.readAsText(file);
-});
 
 updateDisplay();
