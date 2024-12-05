@@ -28,9 +28,11 @@ async function loadData() {
             logs: serverData.logs || []
         };
         updateDisplay();
+        updateLogDisplay();
     } catch (error) {
         console.error('Fehler beim Laden:', error);
         updateDisplay();
+        updateLogDisplay();
     }
 }
 
@@ -54,8 +56,10 @@ function addLog(action, details) {
 }
 
 function updateLogDisplay() {
-    if (currentUser && currentUser.logAccess) {
-        document.getElementById('logOverview').value = data.logs.join('\n');
+    const logElement = document.getElementById('logOverview');
+    if (currentUser && currentUser.logAccess && logElement) {
+        logElement.value = data.logs.join('\n');
+        document.querySelector('.log-section').style.display = 'block';
     }
 }
 
@@ -245,7 +249,6 @@ function calculateOwed(person) {
     return salesDebt + eigenkonsum - data.payments[person];
 }
 
-// Admin Funktionen
 function adminAddStock() {
     if (!currentUser.isAdmin) return;
     const person = document.getElementById('adminPerson').value;
