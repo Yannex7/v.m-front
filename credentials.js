@@ -34,5 +34,11 @@ const encryptedCredentials = CryptoJS.AES.encrypt(JSON.stringify({
         isAdmin: false,
         stockAdmin: false,
         logAccess: false
+    },
+    hannes: {                    // Neu hinzugefügt
+        password: "Hn8$kP4m",
+        isAdmin: false,
+        stockAdmin: false,
+        logAccess: false
     }
 }), "vapeSecretKey").toString();
