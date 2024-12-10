@@ -4,8 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Schuldner Verwaltung</title>
-    <link rel="stylesheet" href="style.css">
     <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 10px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #f0f2f5;
+        }
+        .content-wrapper {
+            padding-top: 60px;
+        }
+        .section {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        input, button {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            min-width: 100px;
+        }
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background-color: #2196F3;
+            width: auto;
+            z-index: 1000;
+        }
         .debtor-item {
             background: #f5f5f5;
             padding: 10px;
@@ -29,6 +72,22 @@
             margin-bottom: 15px;
             text-align: center;
         }
+        #totalAmount {
+            font-size: 1.2em;
+            margin-top: 20px;
+            padding: 10px;
+            background: #e8f5e9;
+            border-radius: 5px;
+            text-align: right;
+        }
+        @media (max-width: 768px) {
+            .input-group {
+                flex-direction: column;
+            }
+            input, button {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -48,22 +107,20 @@
         <div class="section">
             <h2>Schuldner Liste</h2>
             <div id="debtorList"></div>
-            <div id="totalAmount" style="margin-top: 20px; font-weight: bold;"></div>
+            <div id="totalAmount"></div>
         </div>
     </div>
 
     <script>
-        // Lade Schuldner aus localStorage oder erstelle leeres Array
         let debtors = JSON.parse(localStorage.getItem('debtors')) || [];
 
-        // Füge neuen Schuldner hinzu
         function addDebtor() {
             const name = document.getElementById('debtorName').value.trim();
             const amount = parseFloat(document.getElementById('debtAmount').value);
             
             if (name && amount > 0) {
                 debtors.push({
-                    id: Date.now(), // Unique ID für jeden Eintrag
+                    id: Date.now(),
                     name: name,
                     amount: amount,
                     date: new Date().toLocaleDateString()
@@ -71,50 +128,42 @@
                 
                 saveAndUpdate();
                 
-                // Eingabefelder leeren
                 document.getElementById('debtorName').value = '';
                 document.getElementById('debtAmount').value = '';
             }
         }
 
-        // Lösche einen Schuldner
         function deleteDebtor(id) {
             debtors = debtors.filter(debtor => debtor.id !== id);
             saveAndUpdate();
         }
 
-        // Speichere in localStorage und aktualisiere Anzeige
         function saveAndUpdate() {
             localStorage.setItem('debtors', JSON.stringify(debtors));
             updateDisplay();
         }
 
-        // Aktualisiere die Anzeige
         function updateDisplay() {
             const listElement = document.getElementById('debtorList');
             const totalElement = document.getElementById('totalAmount');
             let total = 0;
             
-            // Liste leeren
             listElement.innerHTML = '';
             
-            // Schuldner anzeigen
             debtors.forEach(debtor => {
                 const div = document.createElement('div');
                 div.className = 'debtor-item';
                 div.innerHTML = `
-                    <span>${debtor.name}: ${debtor.amount}€ (${debtor.date})</span>
+                    <span>${debtor.name}: ${debtor.amount.toFixed(2)}€ (${debtor.date})</span>
                     <button class="delete-btn" onclick="deleteDebtor(${debtor.id})">Löschen</button>
                 `;
                 listElement.appendChild(div);
                 total += debtor.amount;
             });
             
-            // Gesamtbetrag anzeigen
             totalElement.textContent = `Gesamtbetrag: ${total.toFixed(2)}€`;
         }
 
-        // Initial anzeigen
         updateDisplay();
     </script>
 </body>
