@@ -7,10 +7,10 @@ const PRICES = {
 
 let currentUser = null;
 let data = {
-    stock: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-    sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-    consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-    payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+    stock: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
+    sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
+    consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
+    payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
     totalQuantity: 0,
     logs: []
 };
@@ -20,10 +20,10 @@ async function loadData() {
         const response = await fetch('https://v-m-259c.onrender.com/api/data');
         const serverData = await response.json();
         data = {
-            stock: serverData.stock || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            sales: serverData.sales || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            consumed: serverData.consumed || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            payments: serverData.payments || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            stock: serverData.stock || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
+            sales: serverData.sales || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
+            consumed: serverData.consumed || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
+            payments: serverData.payments || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
             totalQuantity: serverData.totalQuantity || 0,
             logs: serverData.logs || []
         };
@@ -158,7 +158,7 @@ function showStatistics() {
         const salesChart = new Chart('salesChart', {
             type: 'bar',
             data: {
-                labels: ['ROBIN', 'ROBIN.K', 'ADRIAN', 'ANDREAS', 'MARTIN'],
+                labels: ['ROBIN', 'ROBIN.K', 'ADRIAN', 'ANDREAS', 'MARTIN', 'HANNES'],
                 datasets: [{
                     label: 'Verkäufe',
                     data: Object.values(data.sales),
@@ -215,7 +215,7 @@ function updateDisplay() {
         `Provisionen: ${totals.totalProvisions.toFixed(2)}€\n` +
         `Gesamtgewinn: ${totals.totalGewinn.toFixed(2)}€`;
     
-    ['robin', 'robink', 'adrian', 'andreas', 'martin'].forEach(person => {
+    ['robin', 'robink', 'adrian', 'andreas', 'martin', 'hannes'].forEach(person => {
         if (currentUser.isAdmin || currentUser.stockAdmin || currentUser.username === person) {
             const owed = calculateOwed(person);
             const displayName = person === 'robink' ? 'ROBIN.K' : person.toUpperCase();
@@ -259,8 +259,38 @@ function calculateOwed(person) {
     return salesDebt + eigenkonsum - data.payments[person];
 }
 
+function runnerAddSale() {
+    if (!currentUser || currentUser.isAdmin) return;
+    const amount = parseInt(document.getElementById('runnerAmount').value);
+    if (amount && amount > 0) {
+        if (data.stock[currentUser.username] >= amount) {
+            data.sales[currentUser.username] += amount;
+            data.stock[currentUser.username] -= amount;
+            addLog('Runner Verkauf+', `${amount}`);
+            saveData();
+        } else {
+            alert('Nicht genügend Lagerbestand!');
+        }
+    }
+}
+
+function runnerAddConsumption() {
+    if (!currentUser || currentUser.isAdmin) return;
+    const amount = parseInt(document.getElementById('runnerAmount').value);
+    if (amount && amount > 0) {
+        if (data.stock[currentUser.username] >= amount) {
+            data.consumed[currentUser.username] += amount;
+            data.stock[currentUser.username] -= amount;
+            addLog('Runner Eigenkonsum+', `${amount}`);
+            saveData();
+        } else {
+            alert('Nicht genügend Lagerbestand!');
+        }
+    }
+}
+
 function adminAddStock() {
-    if (!currentUser.isAdmin) return;
+    if (!currentUser.isAdmin && !currentUser.stockAdmin) return;
     const person = document.getElementById('adminPerson').value;
     const amount = parseInt(document.getElementById('adminAmount').value);
     if (person && amount) {
@@ -271,7 +301,7 @@ function adminAddStock() {
 }
 
 function adminRemoveStock() {
-    if (!currentUser.isAdmin) return;
+    if (!currentUser.isAdmin && !currentUser.stockAdmin) return;
     const person = document.getElementById('adminPerson').value;
     const amount = parseInt(document.getElementById('adminAmount').value);
     if (person && amount && data.stock[person] >= amount) {
@@ -363,10 +393,10 @@ function adminResetAll() {
     if (!currentUser.isAdmin) return;
     if (confirm('Wirklich alle Daten zurücksetzen?')) {
         data = {
-            stock: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
+            stock: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
+            sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
+            consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
+            payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0, hannes: 0 },
             totalQuantity: 0,
             logs: []
         };
