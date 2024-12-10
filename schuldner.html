@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schuldner Verwaltung</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .debtor-item {
+            background: #f5f5f5;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .delete-btn {
+            background-color: #f44336;
+            padding: 5px 10px;
+            border-radius: 3px;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .warning-text {
+            color: #f44336;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="content-wrapper">
+        <button onclick="window.location.href='index.html'" class="back-btn">Zurück</button>
+
+        <div class="section">
+            <h2>Schuldner Verwaltung</h2>
+            <p class="warning-text">⚠️ Achtung: Die Daten werden nur lokal in diesem Browser gespeichert!</p>
+            <div class="input-group">
+                <input type="text" id="debtorName" placeholder="Name des Schuldners">
+                <input type="number" id="debtAmount" placeholder="Schuldbetrag in €">
+                <button onclick="addDebtor()">Hinzufügen</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Schuldner Liste</h2>
+            <div id="debtorList"></div>
+            <div id="totalAmount" style="margin-top: 20px; font-weight: bold;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Lade Schuldner aus localStorage oder erstelle leeres Array
+        let debtors = JSON.parse(localStorage.getItem('debtors')) || [];
+
+        // Füge neuen Schuldner hinzu
+        function addDebtor() {
+            const name = document.getElementById('debtorName').value.trim();
+            const amount = parseFloat(document.getElementById('debtAmount').value);
+            
+            if (name && amount > 0) {
+                debtors.push({
+                    id: Date.now(), // Unique ID für jeden Eintrag
+                    name: name,
+                    amount: amount,
+                    date: new Date().toLocaleDateString()
+                });
+                
+                saveAndUpdate();
+                
+                // Eingabefelder leeren
+                document.getElementById('debtorName').value = '';
+                document.getElementById('debtAmount').value = '';
+            }
+        }
+
+        // Lösche einen Schuldner
+        function deleteDebtor(id) {
+            debtors = debtors.filter(debtor => debtor.id !== id);
+            saveAndUpdate();
+        }
+
+        // Speichere in localStorage und aktualisiere Anzeige
+        function saveAndUpdate() {
+            localStorage.setItem('debtors', JSON.stringify(debtors));
+            updateDisplay();
+        }
+
+        // Aktualisiere die Anzeige
+        function updateDisplay() {
+            const listElement = document.getElementById('debtorList');
+            const totalElement = document.getElementById('totalAmount');
+            let total = 0;
+            
+            // Liste leeren
+            listElement.innerHTML = '';
+            
+            // Schuldner anzeigen
+            debtors.forEach(debtor => {
+                const div = document.createElement('div');
+                div.className = 'debtor-item';
+                div.innerHTML = `
+                    <span>${debtor.name}: ${debtor.amount}€ (${debtor.date})</span>
+                    <button class="delete-btn" onclick="deleteDebtor(${debtor.id})">Löschen</button>
+                `;
+                listElement.appendChild(div);
+                total += debtor.amount;
+            });
+            
+            // Gesamtbetrag anzeigen
+            totalElement.textContent = `Gesamtbetrag: ${total.toFixed(2)}€`;
+        }
+
+        // Initial anzeigen
+        updateDisplay();
+    </script>
+</body>
+</html>
