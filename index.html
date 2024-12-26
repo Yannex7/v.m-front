@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vape Management</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -33,7 +34,6 @@
                     <option value="adrian">Adrian</option>
                     <option value="andreas">Andreas</option>
                     <option value="martin">Martin</option>
-                    <option value="hannes">Hannes</option>
                 </select>
                 <input type="number" id="adminAmount" placeholder="Anzahl">
                 <button onclick="adminAddStock()">Lager +</button>
@@ -70,7 +70,6 @@
                 <button onclick="runnerAddSale()">Verkauf +</button>
                 <button onclick="runnerAddConsumption()">Eigenkonsum +</button>
             </div>
-            <!-- Neuer Schuldner-Button -->
             <button onclick="window.location.href='schuldner.html'" class="secondary-btn">Schuldner Verwaltung</button>
         </div>
 
@@ -82,7 +81,6 @@
             <textarea id="adrianOverview" readonly></textarea>
             <textarea id="andreasOverview" readonly></textarea>
             <textarea id="martinOverview" readonly></textarea>
-            <textarea id="hannesOverview" readonly></textarea>
         </div>
 
         <div class="section log-section" style="display: none;">
