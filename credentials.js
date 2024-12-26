@@ -8,13 +8,13 @@ const encryptedCredentials = CryptoJS.AES.encrypt(JSON.stringify({
     robin: {
         password: "Rb7$kN9v",
         isAdmin: false,
-        stockAdmin: true,
+        stockAdmin: false,
         logAccess: false
     },
     andreas: {
         password: "An9$tL6y",
         isAdmin: false,
-        stockAdmin: true,
+        stockAdmin: false,
         logAccess: false
     },
     robink: {
@@ -31,12 +31,6 @@ const encryptedCredentials = CryptoJS.AES.encrypt(JSON.stringify({
     },
     martin: {
         password: "xP91$mV5",
-        isAdmin: false,
-        stockAdmin: false,
-        logAccess: false
-    },
-    hannes: {
-        password: "Hn8$kP4m",
         isAdmin: false,
         stockAdmin: false,
         logAccess: false
