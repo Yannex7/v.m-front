@@ -1,408 +1,832 @@
-const PRICES = {
-    EINKAUF: 7.50,
-    VERKAUF: 25.00,
-    EIGENKONSUM: 10.00,
-    PROVISION: 10.00
-};
-
+let orders = [];
+let currentOrder = null;
 let currentUser = null;
-let data = {
-    stock: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-    sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-    consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-    payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-    totalQuantity: 0,
-    logs: []
-};
+let confirmCallback = null;
 
-async function loadData() {
-    try {
-        const response = await fetch('https://v-m-259c.onrender.com/api/data');
-        const serverData = await response.json();
-        data = {
-            stock: serverData.stock || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            sales: serverData.sales || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            consumed: serverData.consumed || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            payments: serverData.payments || { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            totalQuantity: serverData.totalQuantity || 0,
-            logs: serverData.logs || []
-        };
-        updateDisplay();
-        updateLogDisplay();
-    } catch (error) {
-        console.error('Fehler beim Laden:', error);
-        updateDisplay();
-        updateLogDisplay();
-    }
-}
+const SERVER_URL = 'https://v-m-259c.onrender.com';
 
-loadData();
-checkLoginStatus();
-
-function checkLoginStatus() {
-    const loginData = JSON.parse(localStorage.getItem('vapeLoginData'));
-    if (loginData && loginData.expiry > new Date().getTime()) {
-        currentUser = loginData.user;
-        handleLoginSuccess();
-    }
-}
-
-function addLog(action, details) {
-    const timestamp = new Date().toLocaleString();
-    const logEntry = `${timestamp} - ${currentUser.username}: ${action} - ${details}`;
-    data.logs.unshift(logEntry);
-    if (data.logs.length > 50) data.logs.pop();
-    updateLogDisplay();
-}
-
-function updateLogDisplay() {
-    const logElement = document.getElementById('logOverview');
-    if (currentUser && currentUser.logAccess && logElement) {
-        logElement.value = data.logs.join('\n');
-        document.querySelector('.log-section').style.display = 'block';
-    }
-}
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('password').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            login();
+        }
+    });
+});
 
 function decryptCredentials() {
-    const decrypted = CryptoJS.AES.decrypt(encryptedCredentials, "vapeSecretKey").toString(CryptoJS.enc.Utf8);
+    const decrypted = CryptoJS.AES.decrypt(encryptedCredentials, "inventarSecretKey").toString(CryptoJS.enc.Utf8);
     return JSON.parse(decrypted);
 }
 
 function login() {
-    const username = document.getElementById('username').value;
+    const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
+    
+    if (!username || !password) {
+        showToast('Bitte Benutzername und Passwort eingeben!', 'error');
+        return;
+    }
+
     const users = decryptCredentials();
 
     if (users[username] && users[username].password === password) {
         currentUser = {
             username: username,
-            isAdmin: users[username].isAdmin,
-            stockAdmin: users[username].stockAdmin,
-            logAccess: users[username].logAccess
+            isAdmin: username === 'admin'
         };
-        
-        const loginData = {
-            user: currentUser,
-            expiry: new Date().getTime() + (24 * 60 * 60 * 1000)
-        };
-        localStorage.setItem('vapeLoginData', JSON.stringify(loginData));
-        
-        addLog('Login', 'Erfolgreich eingeloggt');
         handleLoginSuccess();
     } else {
-        alert('Falscher Benutzername oder Passwort!');
+        showToast('Falscher Benutzername oder Passwort!', 'error');
+        document.getElementById('password').value = '';
     }
 }
 
 function handleLoginSuccess() {
     document.getElementById('loginSection').style.display = 'none';
-    document.querySelector('.content-wrapper').style.display = 'block';
-    document.querySelector('.logout-btn').style.display = 'block';
+    document.getElementById('mainApp').style.display = 'block';
     
-    document.querySelectorAll('.admin-only').forEach(el => {
-        el.style.display = currentUser.isAdmin ? 'block' : 'none';
-    });
-    
-    document.querySelectorAll('.stock-admin-only').forEach(el => {
-        el.style.display = currentUser.stockAdmin ? 'block' : 'none';
-    });
-    
-    document.querySelector('.log-section').style.display = 
-        currentUser.logAccess ? 'block' : 'none';
-    
-    updateDisplay();
-    updateLogDisplay();
+    showToast(`Willkommen, ${currentUser.username}!`, 'success');
+    loadOrders();
 }
 
 function logout() {
-    localStorage.removeItem('vapeLoginData');
-    addLog('Logout', 'Ausgeloggt');
     currentUser = null;
-    location.reload();
+    document.getElementById('loginSection').style.display = 'block';
+    document.getElementById('mainApp').style.display = 'none';
+    
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    
+    orders = [];
+    currentOrder = null;
 }
 
-async function saveData() {
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()">&times;</button>
+    `;
+    
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+
+function showLoading() {
+    document.getElementById('loadingOverlay').style.display = 'flex';
+}
+
+function hideLoading() {
+    document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+async function loadOrders() {
+    if (!currentUser) return;
+    
+    showLoading();
     try {
-        await fetch('https://v-m-259c.onrender.com/api/data', {
+        const response = await fetch(`${SERVER_URL}/api/orders`);
+        if (response.ok) {
+            orders = await response.json();
+            displayOrders();
+            showToast('Bestellungen erfolgreich geladen', 'success');
+        } else {
+            throw new Error('Server-Fehler');
+        }
+    } catch (error) {
+        console.error('Fehler beim Laden der Bestellungen:', error);
+        orders = [];
+        displayOrders();
+        showToast('Fehler beim Laden der Bestellungen', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function displayOrders() {
+    const grid = document.getElementById('ordersGrid');
+    grid.innerHTML = '';
+
+    if (orders.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <h3>Noch keine Bestellungen vorhanden</h3>
+                <p>Erstellen Sie Ihre erste Bestellung, um zu beginnen!</p>
+                <button class="btn" onclick="showNewOrderModal()">Erste Bestellung erstellen</button>
+            </div>
+        `;
+        return;
+    }
+
+    orders.forEach(order => {
+        const stats = calculateOrderStats(order);
+        const card = document.createElement('div');
+        card.className = 'order-card';
+        card.onclick = () => openOrderDetail(order);
+        
+        const profitClass = stats.totalProfit >= 0 ? 'profit-positive' : 'profit-negative';
+        const stockClass = stats.currentStock <= 5 ? 'stock-low' : 'stock-normal';
+        
+        card.innerHTML = `
+            <div class="order-header">
+                <div class="order-title">${order.name}</div>
+                <div class="order-date">${new Date(order.createdAt).toLocaleDateString()}</div>
+            </div>
+            <div class="order-info">
+                <p><strong>Einkaufspreis:</strong> ${order.costPrice.toFixed(2)}€/Stück</p>
+                <p><strong>Kunden:</strong> ${order.customers ? order.customers.length : 0}</p>
+            </div>
+            <div class="order-stats">
+                <div class="stat-item ${stockClass}">
+                    <div class="stat-value">${stats.currentStock}</div>
+                    <div class="stat-label">Lagerbestand</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.totalSold}</div>
+                    <div class="stat-label">Verkauft</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.totalRevenue.toFixed(2)}€</div>
+                    <div class="stat-label">Umsatz</div>
+                </div>
+                <div class="stat-item ${profitClass}">
+                    <div class="stat-value">${stats.totalProfit.toFixed(2)}€</div>
+                    <div class="stat-label">Gewinn</div>
+                </div>
+            </div>
+            <div class="order-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${(stats.totalSold / order.initialQuantity * 100)}%"></div>
+                </div>
+                <span class="progress-text">${Math.round(stats.totalSold / order.initialQuantity * 100)}% verkauft</span>
+            </div>
+        `;
+        
+        grid.appendChild(card);
+    });
+}
+
+function calculateOrderStats(order) {
+    const totalSold = order.sales ? order.sales.reduce((sum, sale) => sum + sale.quantity, 0) : 0;
+    const currentStock = order.initialQuantity - totalSold;
+    const totalRevenue = order.sales ? order.sales.reduce((sum, sale) => sum + (sale.quantity * sale.pricePerUnit), 0) : 0;
+    const totalCost = totalSold * order.costPrice;
+    const totalProfit = totalRevenue - totalCost;
+    const totalDebt = calculateTotalDebt(order);
+    const totalPaid = order.payments ? order.payments.reduce((sum, payment) => sum + payment.amount, 0) : 0;
+
+    return {
+        currentStock,
+        totalSold,
+        totalRevenue,
+        totalProfit,
+        totalDebt,
+        totalPaid,
+        outstandingDebt: totalDebt - totalPaid
+    };
+}
+
+function calculateTotalDebt(order) {
+    if (!order.sales) return 0;
+    return order.sales.reduce((sum, sale) => sum + (sale.quantity * sale.pricePerUnit), 0);
+}
+
+function showNewOrderModal() {
+    if (!currentUser) return;
+    document.getElementById('newOrderModal').style.display = 'block';
+    document.getElementById('orderName').focus();
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+    
+    if (modalId === 'newOrderModal') {
+        document.getElementById('orderName').value = '';
+        document.getElementById('orderQuantity').value = '';
+        document.getElementById('orderCostPrice').value = '';
+    }
+}
+
+async function createOrder() {
+    if (!currentUser) return;
+    
+    const name = document.getElementById('orderName').value.trim();
+    const quantity = parseInt(document.getElementById('orderQuantity').value);
+    const costPrice = parseFloat(document.getElementById('orderCostPrice').value);
+
+    if (!name || !quantity || !costPrice) {
+        showToast('Bitte alle Felder ausfüllen!', 'error');
+        return;
+    }
+
+    if (quantity <= 0 || costPrice <= 0) {
+        showToast('Anzahl und Preis müssen größer als 0 sein!', 'error');
+        return;
+    }
+
+    const newOrder = {
+        name: name,
+        initialQuantity: quantity,
+        costPrice: costPrice,
+        customers: [],
+        sales: [],
+        payments: [],
+        createdAt: new Date().toISOString(),
+        createdBy: currentUser.username
+    };
+
+    showLoading();
+    try {
+        const response = await fetch(`${SERVER_URL}/api/orders`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(newOrder)
         });
-        updateDisplay();
-        updateLogDisplay();
-    } catch (error) {
-        console.error('Fehler beim Speichern:', error);
-    }
-}
 
-function updateTotalQuantity() {
-    if (!currentUser.isAdmin) return;
-    const amount = parseInt(document.getElementById('totalQuantityInput').value);
-    if (amount >= 0) {
-        data.totalQuantity = amount;
-        addLog('Gesamtanzahl Update', `Neue Gesamtanzahl: ${amount}`);
-        saveData();
-    }
-}
-
-function showStatistics() {
-    if (!currentUser.isAdmin) return;
-    
-    const statsSection = document.getElementById('statisticsSection');
-    
-    if (statsSection.style.display === 'none') {
-        statsSection.style.display = 'block';
-        
-        const salesChart = new Chart('salesChart', {
-            type: 'bar',
-            data: {
-                labels: ['ROBIN', 'ROBIN.K', 'ADRIAN', 'ANDREAS', 'MARTIN'],
-                datasets: [{
-                    label: 'Verkäufe',
-                    data: Object.values(data.sales),
-                    backgroundColor: '#4CAF50'
-                }, {
-                    label: 'Eigenkonsum',
-                    data: Object.values(data.consumed),
-                    backgroundColor: '#2196F3'
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-        
-        const totals = calculateTotals();
-        const financeChart = new Chart('financeChart', {
-            type: 'doughnut',
-            data: {
-                labels: ['Verkäufe', 'Eigenkonsum', 'Einkauf', 'Provision'],
-                datasets: [{
-                    data: [
-                        totals.totalSales,
-                        totals.totalEigenkonsum,
-                        totals.totalEinkauf,
-                        totals.totalProvisions
-                    ],
-                    backgroundColor: ['#4CAF50', '#2196F3', '#f44336', '#FFC107']
-                }]
-            },
-            options: {
-                responsive: true
-            }
-        });
-    } else {
-        statsSection.style.display = 'none';
-    }
-}
-
-function updateDisplay() {
-    const totals = calculateTotals();
-    
-    document.getElementById('totalOverview').value = 
-        `GESAMTÜBERSICHT:\n` +
-        `Gesamtanzahl: ${data.totalQuantity}\n` +
-        `Gesamtverkäufe: ${totals.totalSales.toFixed(2)}€\n` +
-        `Eigenkonsum Einnahmen: ${totals.totalEigenkonsum.toFixed(2)}€\n` +
-        `Einkaufskosten: ${totals.totalEinkauf.toFixed(2)}€\n` +
-        `Provisionen: ${totals.totalProvisions.toFixed(2)}€\n` +
-        `Gesamtgewinn: ${totals.totalGewinn.toFixed(2)}€`;
-    
-    ['robin', 'robink', 'adrian', 'andreas', 'martin'].forEach(person => {
-        if (currentUser.isAdmin || currentUser.stockAdmin || currentUser.username === person) {
-            const owed = calculateOwed(person);
-            const displayName = person === 'robink' ? 'ROBIN.K' : person.toUpperCase();
-            document.getElementById(`${person}Overview`).value = 
-                `${displayName}:\n` +
-                `Lager: ${data.stock[person]}\n` +
-                `Verkäufe: ${data.sales[person]}\n` +
-                `Eigenkonsum: ${data.consumed[person]}\n` +
-                `Gezahlt: ${data.payments[person]}€\n` +
-                `Noch zu zahlen: ${owed.toFixed(2)}€`;
-            document.getElementById(`${person}Overview`).style.display = 'block';
+        if (response.ok) {
+            const createdOrder = await response.json();
+            orders.push(createdOrder);
+            displayOrders();
+            closeModal('newOrderModal');
+            showToast('Bestellung erfolgreich erstellt!', 'success');
         } else {
-            document.getElementById(`${person}Overview`).style.display = 'none';
+            throw new Error('Server-Fehler');
         }
+    } catch (error) {
+        console.error('Fehler:', error);
+        showToast('Fehler beim Erstellen der Bestellung', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function openOrderDetail(order) {
+    currentOrder = order;
+    document.getElementById('orderDetailTitle').textContent = order.name;
+    updateOrderDetailDisplay();
+    document.getElementById('orderDetailModal').style.display = 'block';
+    switchTab('overview');
+}
+
+function updateOrderDetailDisplay() {
+    if (!currentOrder) return;
+    
+    const stats = calculateOrderStats(currentOrder);
+    
+    document.getElementById('detailStock').textContent = stats.currentStock;
+    document.getElementById('detailSold').textContent = stats.totalSold;
+    document.getElementById('detailRevenue').textContent = stats.totalRevenue.toFixed(2) + '€';
+    document.getElementById('detailProfit').textContent = stats.totalProfit.toFixed(2) + '€';
+    
+    document.getElementById('overviewStock').textContent = stats.currentStock + ' Stück';
+    document.getElementById('overviewSold').textContent = stats.totalSold + ' Stück';
+    document.getElementById('overviewRevenue').textContent = stats.totalRevenue.toFixed(2) + '€';
+    document.getElementById('overviewProfit').textContent = stats.totalProfit.toFixed(2) + '€';
+    
+    displayCustomers();
+    displaySales();
+    displayPayments();
+    updateCustomerSelects();
+    displayStatistics();
+    displayRecentActivity();
+}
+
+function switchTab(tabName) {
+    document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+    document.getElementById(tabName).classList.add('active');
+}
+
+async function addCustomer() {
+    const name = document.getElementById('customerName').value.trim();
+    const price = parseFloat(document.getElementById('customerPrice').value);
+
+    if (!name || !price) {
+        showToast('Bitte Name und Preis eingeben!', 'error');
+        return;
+    }
+
+    if (!currentOrder.customers) {
+        currentOrder.customers = [];
+    }
+
+    const existingCustomer = currentOrder.customers.find(c => c.name === name);
+    if (existingCustomer) {
+        showToast('Kunde existiert bereits!', 'error');
+        return;
+    }
+
+    currentOrder.customers.push({
+        id: Date.now(),
+        name: name,
+        pricePerUnit: price
+    });
+
+    await saveCurrentOrder();
+    displayCustomers();
+    updateCustomerSelects();
+    
+    document.getElementById('customerName').value = '';
+    document.getElementById('customerPrice').value = '';
+    showToast('Kunde erfolgreich hinzugefügt!', 'success');
+}
+
+function displayCustomers() {
+    const list = document.getElementById('customersList');
+    list.innerHTML = '';
+
+    if (!currentOrder.customers || currentOrder.customers.length === 0) {
+        list.innerHTML = '<div class="empty-state"><p>Noch keine Kunden hinzugefügt.</p></div>';
+        return;
+    }
+
+    currentOrder.customers.forEach(customer => {
+        const debt = calculateCustomerDebt(customer);
+        const paid = calculateCustomerPaid(customer);
+        const outstanding = debt - paid;
+
+        const item = document.createElement('div');
+        item.className = 'customer-item';
+        item.innerHTML = `
+            <div class="customer-info">
+                <div class="customer-name">${customer.name}</div>
+                <div class="customer-details">
+                    <span>Preis: ${customer.pricePerUnit.toFixed(2)}€/Stück</span>
+                    <span>Schulden: ${outstanding.toFixed(2)}€</span>
+                </div>
+            </div>
+            <button class="btn btn-danger" onclick="removeCustomer(${customer.id})">Löschen</button>
+        `;
+        list.appendChild(item);
     });
 }
 
-function calculateTotals() {
-    let totals = {
-        totalSales: 0,
-        totalEigenkonsum: 0,
-        totalEinkauf: 0,
-        totalGewinn: 0,
-        totalProvisions: 0
-    };
+async function removeCustomer(customerId) {
+    const customer = currentOrder.customers.find(c => c.id === customerId);
+    if (!customer) return;
 
-    for (let person in data.sales) {
-        totals.totalSales += data.sales[person] * PRICES.VERKAUF;
-        totals.totalEigenkonsum += data.consumed[person] * PRICES.EIGENKONSUM;
-        totals.totalEinkauf += (data.sales[person] + data.consumed[person]) * PRICES.EINKAUF;
-        totals.totalProvisions += data.sales[person] * PRICES.PROVISION;
-    }
+    showConfirmModal(
+        'Kunde löschen',
+        `Möchten Sie den Kunden "${customer.name}" wirklich löschen? Alle zugehörigen Verkäufe und Zahlungen werden ebenfalls gelöscht!`,
+        async () => {
+            currentOrder.customers = currentOrder.customers.filter(c => c.id !== customerId);
+            
+            if (currentOrder.sales) {
+                currentOrder.sales = currentOrder.sales.filter(s => s.customerId !== customerId);
+            }
+            
+            if (currentOrder.payments) {
+                currentOrder.payments = currentOrder.payments.filter(p => p.customerId !== customerId);
+            }
 
-    totals.totalGewinn = (totals.totalSales + totals.totalEigenkonsum) - (totals.totalEinkauf + totals.totalProvisions);
-    return totals;
-}
-
-function calculateOwed(person) {
-    const salesDebt = data.sales[person] * 15;
-    const eigenkonsum = data.consumed[person] * PRICES.EIGENKONSUM;
-    return salesDebt + eigenkonsum - data.payments[person];
-}
-
-function runnerAddSale() {
-    if (!currentUser || currentUser.isAdmin) return;
-    const amount = parseInt(document.getElementById('runnerAmount').value);
-    if (amount && amount > 0) {
-        if (data.stock[currentUser.username] >= amount) {
-            data.sales[currentUser.username] += amount;
-            data.stock[currentUser.username] -= amount;
-            addLog('Runner Verkauf+', `${amount}`);
-            saveData();
-        } else {
-            alert('Nicht genügend Lagerbestand!');
+            await saveCurrentOrder();
+            displayCustomers();
+            updateCustomerSelects();
+            updateOrderDetailDisplay();
+            showToast('Kunde erfolgreich gelöscht!', 'success');
         }
-    }
+    );
 }
 
-function runnerAddConsumption() {
-    if (!currentUser || currentUser.isAdmin) return;
-    const amount = parseInt(document.getElementById('runnerAmount').value);
-    if (amount && amount > 0) {
-        if (data.stock[currentUser.username] >= amount) {
-            data.consumed[currentUser.username] += amount;
-            data.stock[currentUser.username] -= amount;
-            addLog('Runner Eigenkonsum+', `${amount}`);
-            saveData();
-        } else {
-            alert('Nicht genügend Lagerbestand!');
+async function addSale() {
+    const customerId = parseInt(document.getElementById('saleCustomer').value);
+    const quantity = parseInt(document.getElementById('saleQuantity').value);
+
+    if (!customerId || !quantity) {
+        showToast('Bitte Kunde und Anzahl auswählen!', 'error');
+        return;
+    }
+
+    const customer = currentOrder.customers.find(c => c.id === customerId);
+    if (!customer) {
+        showToast('Kunde nicht gefunden!', 'error');
+        return;
+    }
+
+    const stats = calculateOrderStats(currentOrder);
+    if (quantity > stats.currentStock) {
+        showToast(`Nicht genügend Lagerbestand! Verfügbar: ${stats.currentStock} Stück`, 'error');
+        return;
+    }
+
+    if (!currentOrder.sales) {
+        currentOrder.sales = [];
+    }
+
+    currentOrder.sales.push({
+        id: Date.now(),
+        customerId: customerId,
+        customerName: customer.name,
+        quantity: quantity,
+        pricePerUnit: customer.pricePerUnit,
+        totalAmount: quantity * customer.pricePerUnit,
+        date: new Date().toISOString()
+    });
+
+    await saveCurrentOrder();
+    displaySales();
+    displayCustomers();
+    updateOrderDetailDisplay();
+    
+    document.getElementById('saleCustomer').value = '';
+    document.getElementById('saleQuantity').value = '';
+    showToast('Verkauf erfolgreich hinzugefügt!', 'success');
+}
+
+function displaySales() {
+    const list = document.getElementById('salesList');
+    list.innerHTML = '';
+
+    if (!currentOrder.sales || currentOrder.sales.length === 0) {
+        list.innerHTML = '<div class="empty-state"><p>Noch keine Verkäufe getätigt.</p></div>';
+        return;
+    }
+
+    currentOrder.sales.forEach(sale => {
+        const item = document.createElement('div');
+        item.className = 'sale-item';
+        item.innerHTML = `
+            <div class="sale-info">
+                <div class="sale-customer">${sale.customerName}</div>
+                <div class="sale-details">
+                    <span>${sale.quantity} Stück × ${sale.pricePerUnit.toFixed(2)}€ = ${sale.totalAmount.toFixed(2)}€</span>
+                    <span>${new Date(sale.date).toLocaleDateString()}</span>
+                </div>
+            </div>
+            <button class="btn btn-danger" onclick="removeSale(${sale.id})">Löschen</button>
+        `;
+        list.appendChild(item);
+    });
+}
+
+async function removeSale(saleId) {
+    const sale = currentOrder.sales.find(s => s.id === saleId);
+    if (!sale) return;
+
+    showConfirmModal(
+        'Verkauf löschen',
+        `Möchten Sie den Verkauf an "${sale.customerName}" wirklich löschen?`,
+        async () => {
+            currentOrder.sales = currentOrder.sales.filter(s => s.id !== saleId);
+            await saveCurrentOrder();
+            displaySales();
+            displayCustomers();
+            updateOrderDetailDisplay();
+            showToast('Verkauf erfolgreich gelöscht!', 'success');
         }
-    }
+    );
 }
 
-function adminAddStock() {
-    if (!currentUser.isAdmin && !currentUser.stockAdmin) return;
-    const person = document.getElementById('adminPerson').value;
-    const amount = parseInt(document.getElementById('adminAmount').value);
-    if (person && amount) {
-        data.stock[person] += amount;
-        addLog('Admin Lager+', `${amount} zu ${person}`);
-        saveData();
+async function addPayment() {
+    const customerId = parseInt(document.getElementById('paymentCustomer').value);
+    const amount = parseFloat(document.getElementById('paymentAmount').value);
+
+    if (!customerId || !amount) {
+        showToast('Bitte Kunde und Betrag auswählen!', 'error');
+        return;
     }
+
+    const customer = currentOrder.customers.find(c => c.id === customerId);
+    if (!customer) {
+        showToast('Kunde nicht gefunden!', 'error');
+        return;
+    }
+
+    if (!currentOrder.payments) {
+        currentOrder.payments = [];
+    }
+
+    currentOrder.payments.push({
+        id: Date.now(),
+        customerId: customerId,
+        customerName: customer.name,
+        amount: amount,
+        date: new Date().toISOString()
+    });
+
+    await saveCurrentOrder();
+    displayPayments();
+    displayCustomers();
+    
+    document.getElementById('paymentCustomer').value = '';
+    document.getElementById('paymentAmount').value = '';
+    showToast('Zahlung erfolgreich hinzugefügt!', 'success');
 }
 
-function adminRemoveStock() {
-    if (!currentUser.isAdmin && !currentUser.stockAdmin) return;
-    const person = document.getElementById('adminPerson').value;
-    const amount = parseInt(document.getElementById('adminAmount').value);
-    if (person && amount && data.stock[person] >= amount) {
-        data.stock[person] -= amount;
-        addLog('Admin Lager-', `${amount} von ${person}`);
-        saveData();
+function displayPayments() {
+    const list = document.getElementById('paymentsList');
+    list.innerHTML = '';
+
+    if (!currentOrder.payments || currentOrder.payments.length === 0) {
+        list.innerHTML = '<div class="empty-state"><p>Noch keine Zahlungen erhalten.</p></div>';
+        return;
     }
+
+    currentOrder.payments.forEach(payment => {
+        const item = document.createElement('div');
+        item.className = 'customer-item';
+        item.innerHTML = `
+            <div class="customer-info">
+                <div class="customer-name">${payment.customerName}</div>
+                <div class="customer-details">
+                    <span>${payment.amount.toFixed(2)}€</span>
+                    <span>${new Date(payment.date).toLocaleDateString()}</span>
+                </div>
+            </div>
+            <button class="btn btn-danger" onclick="removePayment(${payment.id})">Löschen</button>
+        `;
+        list.appendChild(item);
+    });
 }
 
-function adminAddSale() {
-    if (!currentUser.isAdmin) return;
-    const person = document.getElementById('adminPerson').value;
-    const amount = parseInt(document.getElementById('adminAmount').value);
-    if (person && amount) {
-        if (data.stock[person] >= amount) {
-            data.sales[person] += amount;
-            data.stock[person] -= amount;
-            addLog('Admin Verkauf+', `${amount} für ${person}`);
-            saveData();
-        } else {
-            alert('Nicht genügend Lagerbestand!');
+async function removePayment(paymentId) {
+    const payment = currentOrder.payments.find(p => p.id === paymentId);
+    if (!payment) return;
+
+    showConfirmModal(
+        'Zahlung löschen',
+        `Möchten Sie die Zahlung von "${payment.customerName}" wirklich löschen?`,
+        async () => {
+            currentOrder.payments = currentOrder.payments.filter(p => p.id !== paymentId);
+            await saveCurrentOrder();
+            displayPayments();
+            displayCustomers();
+            showToast('Zahlung erfolgreich gelöscht!', 'success');
         }
-    }
+    );
 }
 
-function adminRemoveSale() {
-    if (!currentUser.isAdmin) return;
-    const person = document.getElementById('adminPerson').value;
-    const amount = parseInt(document.getElementById('adminAmount').value);
-    if (person && amount && data.sales[person] >= amount) {
-        data.sales[person] -= amount;
-        data.stock[person] += amount;
-        addLog('Admin Verkauf-', `${amount} von ${person}`);
-        saveData();
-    }
+function updateCustomerSelects() {
+    const saleSelect = document.getElementById('saleCustomer');
+    const paymentSelect = document.getElementById('paymentCustomer');
+    
+    saleSelect.innerHTML = '<option value="">Kunde wählen...</option>';
+    paymentSelect.innerHTML = '<option value="">Kunde wählen...</option>';
+    
+    if (!currentOrder.customers) return;
+    
+    currentOrder.customers.forEach(customer => {
+        const option1 = document.createElement('option');
+        option1.value = customer.id;
+        option1.textContent = customer.name;
+        saleSelect.appendChild(option1);
+        
+        const option2 = document.createElement('option');
+        option2.value = customer.id;
+        option2.textContent = customer.name;
+        paymentSelect.appendChild(option2);
+    });
 }
 
-function adminAddConsumption() {
-    if (!currentUser.isAdmin) return;
-    const person = document.getElementById('adminPerson').value;
-    const amount = parseInt(document.getElementById('adminAmount').value);
-    if (person && amount) {
-        if (data.stock[person] >= amount) {
-            data.consumed[person] += amount;
-            data.stock[person] -= amount;
-            addLog('Admin Eigenkonsum+', `${amount} für ${person}`);
-            saveData();
+function calculateCustomerDebt(customer) {
+    if (!currentOrder.sales) return 0;
+    return currentOrder.sales
+        .filter(sale => sale.customerId === customer.id)
+        .reduce((sum, sale) => sum + sale.totalAmount, 0);
+}
+
+function calculateCustomerPaid(customer) {
+    if (!currentOrder.payments) return 0;
+    return currentOrder.payments
+        .filter(payment => payment.customerId === customer.id)
+        .reduce((sum, payment) => sum + payment.amount, 0);
+}
+
+async function saveCurrentOrder() {
+    if (!currentOrder || !currentUser) return;
+    
+    showLoading();
+    try {
+        const response = await fetch(`${SERVER_URL}/api/orders/${currentOrder._id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(currentOrder)
+        });
+
+        if (response.ok) {
+            const updatedOrder = await response.json();
+            const index = orders.findIndex(o => o._id === currentOrder._id);
+            if (index !== -1) {
+                orders[index] = updatedOrder;
+                currentOrder = updatedOrder;
+            }
+            displayOrders();
         } else {
-            alert('Nicht genügend Lagerbestand!');
+            throw new Error('Server-Fehler');
         }
+    } catch (error) {
+        console.error('Fehler beim Speichern:', error);
+        showToast('Fehler beim Speichern der Daten', 'error');
+    } finally {
+        hideLoading();
     }
 }
 
-function adminRemoveConsumption() {
+function showConfirmModal(title, message, callback) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    confirmCallback = callback;
+    document.getElementById('confirmModal').style.display = 'block';
+}
+
+function confirmAction() {
+    if (confirmCallback) {
+        confirmCallback();
+        confirmCallback = null;
+    }
+    closeModal('confirmModal');
+}
+
+function cancelAction() {
+    confirmCallback = null;
+    closeModal('confirmModal');
+}
+
+async function deleteOrder() {
+    if (!currentOrder || !currentUser.isAdmin) return;
+    
+    showConfirmModal(
+        'Bestellung löschen',
+        `Möchten Sie die Bestellung "${currentOrder.name}" wirklich komplett löschen? Diese Aktion kann nicht rückgängig gemacht werden!`,
+        async () => {
+            showLoading();
+            try {
+                const response = await fetch(`${SERVER_URL}/api/orders/${currentOrder._id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    orders = orders.filter(o => o._id !== currentOrder._id);
+                    displayOrders();
+                    closeModal('orderDetailModal');
+                    showToast('Bestellung erfolgreich gelöscht!', 'success');
+                } else {
+                    throw new Error('Server-Fehler');
+                }
+            } catch (error) {
+                console.error('Fehler beim Löschen:', error);
+                showToast('Fehler beim Löschen der Bestellung', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+    );
+}
+
+async function resetAllData() {
     if (!currentUser.isAdmin) return;
-    const person = document.getElementById('adminPerson').value;
-    const amount = parseInt(document.getElementById('adminAmount').value);
-    if (person && amount && data.consumed[person] >= amount) {
-        data.consumed[person] -= amount;
-        data.stock[person] += amount;
-        addLog('Admin Eigenkonsum-', `${amount} von ${person}`);
-        saveData();
-    }
+    
+    showConfirmModal(
+        'ALLE DATEN LÖSCHEN',
+        'ACHTUNG: Möchten Sie wirklich ALLE Bestellungen und Daten unwiderruflich löschen? Diese Aktion kann NICHT rückgängig gemacht werden!',
+        async () => {
+            showLoading();
+            try {
+                const response = await fetch(`${SERVER_URL}/api/orders/reset-all`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    orders = [];
+                    currentOrder = null;
+                    displayOrders();
+                    closeModal('orderDetailModal');
+                    showToast('Alle Daten erfolgreich gelöscht!', 'success');
+                } else {
+                    throw new Error('Server-Fehler');
+                }
+            } catch (error) {
+                console.error('Fehler beim Zurücksetzen:', error);
+                showToast('Fehler beim Löschen aller Daten', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+    );
 }
 
-function adminAddPayment() {
-    if (!currentUser.isAdmin) return;
-    const person = document.getElementById('adminPerson').value;
-    const amount = parseFloat(document.getElementById('adminPayment').value);
-    if (person && amount) {
-        data.payments[person] += amount;
-        addLog('Admin Zahlung+', `${amount}€ von ${person}`);
-        saveData();
-    }
+function displayStatistics() {
+    if (!currentOrder) return;
+    
+    const stats = calculateOrderStats(currentOrder);
+    const statsContainer = document.getElementById('statisticsContent');
+    
+    statsContainer.innerHTML = `
+        <div class="overview-stats">
+            <div class="overview-card">
+                <div class="overview-icon">📦</div>
+                <div class="overview-info">
+                    <h4>Lagerbestand</h4>
+                    <p>${stats.currentStock} Stück</p>
+                </div>
+            </div>
+            <div class="overview-card">
+                <div class="overview-icon">💰</div>
+                <div class="overview-info">
+                    <h4>Gesamtumsatz</h4>
+                    <p>${stats.totalRevenue.toFixed(2)}€</p>
+                </div>
+            </div>
+            <div class="overview-card">
+                <div class="overview-icon">📈</div>
+                <div class="overview-info">
+                    <h4>Gewinn</h4>
+                    <p class="${stats.totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}">${stats.totalProfit.toFixed(2)}€</p>
+                </div>
+            </div>
+            <div class="overview-card">
+                <div class="overview-icon">💳</div>
+                <div class="overview-info">
+                    <h4>Offene Schulden</h4>
+                    <p>${stats.outstandingDebt.toFixed(2)}€</p>
+                </div>
+            </div>
+        </div>
+        
+        <h4>Kundenübersicht</h4>
+        <div class="customers-overview">
+            ${currentOrder.customers ? currentOrder.customers.map(customer => {
+                const debt = calculateCustomerDebt(customer);
+                const paid = calculateCustomerPaid(customer);
+                const outstanding = debt - paid;
+                
+                return `
+                    <div class="customer-overview-item">
+                        <div class="customer-overview-info">
+                            <strong>${customer.name}</strong>
+                            <div class="customer-overview-stats">
+                                <span>Schulden: ${debt.toFixed(2)}€</span>
+                                <span>Bezahlt: ${paid.toFixed(2)}€</span>
+                                <span class="${outstanding > 0 ? 'debt-outstanding' : 'debt-paid'}">
+                                    Offen: ${outstanding.toFixed(2)}€
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('') : '<p>Keine Kunden vorhanden.</p>'}
+        </div>
+    `;
 }
 
-function adminRemovePayment() {
-    if (!currentUser.isAdmin) return;
-    const person = document.getElementById('adminPerson').value;
-    const amount = parseFloat(document.getElementById('adminPayment').value);
-    if (person && amount && data.payments[person] >= amount) {
-        data.payments[person] -= amount;
-        addLog('Admin Zahlung-', `${amount}€ von ${person}`);
-        saveData();
+function displayRecentActivity() {
+    if (!currentOrder) return;
+    
+    const activities = [];
+    
+    if (currentOrder.sales) {
+        currentOrder.sales.forEach(sale => {
+            activities.push({
+                type: 'sale',
+                date: new Date(sale.date),
+                text: `Verkauf: ${sale.quantity} Stück an ${sale.customerName} für ${sale.totalAmount.toFixed(2)}€`
+            });
+        });
     }
-}
-
-function adminResetAll() {
-    if (!currentUser.isAdmin) return;
-    if (confirm('Wirklich alle Daten zurücksetzen?')) {
-        data = {
-            stock: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            sales: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            consumed: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            payments: { robin: 0, robink: 0, adrian: 0, andreas: 0, martin: 0 },
-            totalQuantity: 0,
-            logs: []
-        };
-        addLog('Reset', 'Alle Daten zurückgesetzt');
-        saveData();
+    
+    if (currentOrder.payments) {
+        currentOrder.payments.forEach(payment => {
+            activities.push({
+                type: 'payment',
+                date: new Date(payment.date),
+                text: `Zahlung: ${payment.amount.toFixed(2)}€ von ${payment.customerName}`
+            });
+        });
     }
+    
+    activities.sort((a, b) => b.date - a.date);
+    
+    const activityContainer = document.getElementById('activityContent');
+    
+    if (activities.length === 0) {
+        activityContainer.innerHTML = '<div class="empty-state"><p>Noch keine Aktivitäten vorhanden.</p></div>';
+        return;
+    }
+    
+    activityContainer.innerHTML = `
+        <div class="activity-list">
+            ${activities.slice(0, 10).map(activity => `
+                <div class="activity-item activity-${activity.type}">
+                    <div class="activity-icon">${activity.type === 'sale' ? '💰' : '💳'}</div>
+                    <div class="activity-content">
+                        <div class="activity-text">${activity.text}</div>
+                        <div class="activity-date">${activity.date.toLocaleDateString()} ${activity.date.toLocaleTimeString()}</div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
 }
-
-updateDisplay();
