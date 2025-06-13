@@ -292,6 +292,15 @@ function updateOrderDetailDisplay() {
     document.getElementById('overviewRevenue').textContent = stats.totalRevenue.toFixed(2) + '€';
     document.getElementById('overviewProfit').textContent = stats.totalProfit.toFixed(2) + '€';
     
+    // ADMIN BUTTONS ANZEIGEN
+    if (currentUser && currentUser.isAdmin) {
+        document.getElementById('adminDangerZone').style.display = 'block';
+        document.getElementById('deleteOrderBtn').style.display = 'block';
+    } else {
+        document.getElementById('adminDangerZone').style.display = 'none';
+        document.getElementById('deleteOrderBtn').style.display = 'none';
+    }
+    
     displayCustomers();
     displaySales();
     displayPayments();
