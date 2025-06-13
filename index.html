@@ -3,91 +3,286 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vape Management</title>
+    <title>Inventar Management</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div id="loginSection">
+    <!-- Login Section -->
+    <div id="loginSection" class="login-overlay">
         <div class="login-box">
-            <h2>Login</h2>
-            <div class="input-group">
-                <input type="text" id="username" placeholder="Benutzername">
-                <input type="password" id="password" placeholder="Passwort">
-                <button onclick="login()">Einloggen</button>
+            <h2>🔐 Inventar Login</h2>
+            <div class="login-form">
+                <div class="form-group">
+                    <input type="text" id="username" placeholder="Benutzername" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <input type="password" id="password" placeholder="Passwort" autocomplete="current-password">
+                </div>
+                <button class="btn" onclick="login()">Einloggen</button>
             </div>
         </div>
     </div>
 
-    <div class="content-wrapper">
-        <button onclick="logout()" class="logout-btn">Ausloggen</button>
-
-        <div class="section admin-only">
-            <h2>Admin Verwaltung</h2>
-            <div class="input-group">
-                <select id="adminPerson">
-                    <option value="">Person wählen...</option>
-                    <option value="robin">Robin</option>
-                    <option value="robink">Robin.K</option>
-                    <option value="adrian">Adrian</option>
-                    <option value="andreas">Andreas</option>
-                    <option value="martin">Martin</option>
-                </select>
-                <input type="number" id="adminAmount" placeholder="Anzahl">
-                <button onclick="adminAddStock()">Lager +</button>
-                <button onclick="adminRemoveStock()">Lager -</button>
-                <button onclick="adminAddSale()">Verkauf +</button>
-                <button onclick="adminRemoveSale()">Verkauf -</button>
-                <button onclick="adminAddConsumption()">Eigenkonsum +</button>
-                <button onclick="adminRemoveConsumption()">Eigenkonsum -</button>
+    <!-- Main Application -->
+    <div id="mainApp" style="display: none;">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <h1>📦 Inventar Management</h1>
+                <p>Verwalten Sie Ihre Bestellungen und Kunden effizient</p>
             </div>
-            <div class="input-group">
-                <input type="number" id="adminPayment" placeholder="Zahlung">
-                <button onclick="adminAddPayment()">Zahlung +</button>
-                <button onclick="adminRemovePayment()">Zahlung -</button>
-            </div>
-            <button onclick="adminResetAll()" class="delete">Alles Zurücksetzen</button>
-            <button onclick="showStatistics()" class="load">Statistik anzeigen</button>
+            <button class="btn" onclick="showNewOrderModal()">+ Neue Bestellung</button>
         </div>
 
-        <div id="statisticsSection" class="section admin-only" style="display: none;">
-            <div class="chart-container">
-                <h3>Verkäufe & Eigenkonsum</h3>
-                <canvas id="salesChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <h3>Finanzübersicht</h3>
-                <canvas id="financeChart"></canvas>
-            </div>
-        </div>
+        <button class="btn btn-danger logout-btn" onclick="logout()">Ausloggen</button>
 
-        <div class="section runner-section">
-            <h2>Verwaltung</h2>
-            <div class="input-group">
-                <input type="number" id="runnerAmount" placeholder="Anzahl">
-                <button onclick="runnerAddSale()">Verkauf +</button>
-                <button onclick="runnerAddConsumption()">Eigenkonsum +</button>
-            </div>
-            <button onclick="window.location.href='schuldner.html'" class="secondary-btn">Schuldner Verwaltung</button>
-        </div>
-
-        <div class="section">
-            <h2>Übersichten</h2>
-            <textarea id="totalOverview" readonly></textarea>
-            <textarea id="robinOverview" readonly></textarea>
-            <textarea id="robinkOverview" readonly></textarea>
-            <textarea id="adrianOverview" readonly></textarea>
-            <textarea id="andreasOverview" readonly></textarea>
-            <textarea id="martinOverview" readonly></textarea>
-        </div>
-
-        <div class="section log-section" style="display: none;">
-            <h2>Aktivitätsprotokoll</h2>
-            <textarea id="logOverview" readonly></textarea>
+        <!-- Orders Grid -->
+        <div class="orders-container">
+            <div id="ordersGrid" class="orders-grid"></div>
         </div>
     </div>
+
+    <!-- New Order Modal -->
+    <div id="newOrderModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>📦 Neue Bestellung erstellen</h2>
+                <span class="close" onclick="closeModal('newOrderModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="orderName">Bestellungsname:</label>
+                    <input type="text" id="orderName" placeholder="z.B. Vape Charge 2024-01">
+                </div>
+                <div class="form-group">
+                    <label for="orderQuantity">Anzahl Stück:</label>
+                    <input type="number" id="orderQuantity" placeholder="z.B. 100" min="1">
+                </div>
+                <div class="form-group">
+                    <label for="orderCostPrice">Einkaufspreis pro Stück (€):</label>
+                    <input type="number" id="orderCostPrice" placeholder="z.B. 7.50" step="0.01" min="0">
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-secondary" onclick="closeModal('newOrderModal')">Abbrechen</button>
+                    <button class="btn" onclick="createOrder()">Bestellung erstellen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Detail Modal -->
+    <div id="orderDetailModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <div>
+                    <h2 id="orderDetailTitle">Bestellung Details</h2>
+                    <div class="order-quick-stats">
+                        <span>📦 Lager: <strong id="detailStock">0</strong></span>
+                        <span>💰 Verkauft: <strong id="detailSold">0</strong></span>
+                        <span>💵 Umsatz: <strong id="detailRevenue">0€</strong></span>
+                        <span>📈 Gewinn: <strong id="detailProfit">0€</strong></span>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-danger" onclick="deleteOrder()" style="display: none;" id="deleteOrderBtn">🗑️ Löschen</button>
+                    <span class="close" onclick="closeModal('orderDetailModal')">&times;</span>
+                </div>
+            </div>
+            <div class="modal-body">
+                <!-- Tabs -->
+                <div class="tabs">
+                    <div class="tab active" onclick="switchTab('overview')">
+                        <span class="tab-icon">📊</span>
+                        Übersicht
+                    </div>
+                    <div class="tab" onclick="switchTab('customers')">
+                        <span class="tab-icon">👥</span>
+                        Kunden
+                    </div>
+                    <div class="tab" onclick="switchTab('sales')">
+                        <span class="tab-icon">💰</span>
+                        Verkäufe
+                    </div>
+                    <div class="tab" onclick="switchTab('payments')">
+                        <span class="tab-icon">💳</span>
+                        Zahlungen
+                    </div>
+                    <div class="tab" onclick="switchTab('statistics')">
+                        <span class="tab-icon">📈</span>
+                        Statistiken
+                    </div>
+                    <div class="tab" onclick="switchTab('activity')">
+                        <span class="tab-icon">📋</span>
+                        Aktivitäten
+                    </div>
+                </div>
+
+                <!-- Overview Tab -->
+                <div id="overview" class="tab-content active">
+                    <div class="overview-section">
+                        <h3>📊 Bestellungsübersicht</h3>
+                        <div class="overview-stats">
+                            <div class="overview-card">
+                                <div class="overview-icon">📦</div>
+                                <div class="overview-info">
+                                    <h4>Lagerbestand</h4>
+                                    <p id="overviewStock">0 Stück</p>
+                                </div>
+                            </div>
+                            <div class="overview-card">
+                                <div class="overview-icon">💰</div>
+                                <div class="overview-info">
+                                    <h4>Verkauft</h4>
+                                    <p id="overviewSold">0 Stück</p>
+                                </div>
+                            </div>
+                            <div class="overview-card">
+                                <div class="overview-icon">💵</div>
+                                <div class="overview-info">
+                                    <h4>Umsatz</h4>
+                                    <p id="overviewRevenue">0€</p>
+                                </div>
+                            </div>
+                            <div class="overview-card">
+                                <div class="overview-icon">📈</div>
+                                <div class="overview-info">
+                                    <h4>Gewinn</h4>
+                                    <p id="overviewProfit">0€</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Admin Danger Zone -->
+                        <div class="admin-danger-zone" id="adminDangerZone" style="display: none;">
+                            <h4>⚠️ Gefahrenzone - Nur für Administratoren</h4>
+                            <p>Die folgenden Aktionen sind unwiderruflich und löschen Daten permanent!</p>
+                            <div style="display: flex; gap: 15px;">
+                                <button class="btn btn-danger-zone" onclick="deleteOrder()">🗑️ Diese Bestellung löschen</button>
+                                <button class="btn btn-danger-zone" onclick="resetAllData()">💥 ALLE Daten löschen</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customers Tab -->
+                <div id="customers" class="tab-content">
+                    <div class="section-header">
+                        <h3>👥 Kunden verwalten</h3>
+                        <p>Fügen Sie Kunden hinzu und legen Sie individuelle Preise fest</p>
+                    </div>
+                    
+                    <div class="input-row">
+                        <div class="form-group">
+                            <label for="customerName">Kundenname:</label>
+                            <input type="text" id="customerName" placeholder="z.B. Max Mustermann">
+                        </div>
+                        <div class="form-group">
+                            <label for="customerPrice">Preis pro Stück (€):</label>
+                            <input type="number" id="customerPrice" placeholder="z.B. 25.00" step="0.01" min="0">
+                        </div>
+                        <button class="btn" onclick="addCustomer()">+ Kunde hinzufügen</button>
+                    </div>
+                    
+                    <div id="customersList" class="customers-list"></div>
+                </div>
+
+                <!-- Sales Tab -->
+                <div id="sales" class="tab-content">
+                    <div class="section-header">
+                        <h3>💰 Verkäufe erfassen</h3>
+                        <p>Erfassen Sie Verkäufe an Ihre Kunden</p>
+                    </div>
+                    
+                    <div class="input-row">
+                        <div class="form-group">
+                            <label for="saleCustomer">Kunde:</label>
+                            <select id="saleCustomer">
+                                <option value="">Kunde wählen...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="saleQuantity">Anzahl:</label>
+                            <input type="number" id="saleQuantity" placeholder="z.B. 5" min="1">
+                        </div>
+                        <button class="btn" onclick="addSale()">+ Verkauf hinzufügen</button>
+                    </div>
+                    
+                    <div id="salesList" class="sales-list"></div>
+                </div>
+
+                <!-- Payments Tab -->
+                <div id="payments" class="tab-content">
+                    <div class="section-header">
+                        <h3>💳 Zahlungen erfassen</h3>
+                        <p>Erfassen Sie erhaltene Zahlungen von Ihren Kunden</p>
+                    </div>
+                    
+                    <div class="input-row">
+                        <div class="form-group">
+                            <label for="paymentCustomer">Kunde:</label>
+                            <select id="paymentCustomer">
+                                <option value="">Kunde wählen...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="paymentAmount">Betrag (€):</label>
+                            <input type="number" id="paymentAmount" placeholder="z.B. 125.00" step="0.01" min="0">
+                        </div>
+                        <button class="btn" onclick="addPayment()">+ Zahlung hinzufügen</button>
+                    </div>
+                    
+                    <div id="paymentsList" class="customers-list"></div>
+                </div>
+
+                <!-- Statistics Tab -->
+                <div id="statistics" class="tab-content">
+                    <div class="section-header">
+                        <h3>📈 Detaillierte Statistiken</h3>
+                        <p>Ausführliche Analyse Ihrer Bestellung</p>
+                    </div>
+                    <div id="statisticsContent"></div>
+                </div>
+
+                <!-- Activity Tab -->
+                <div id="activity" class="tab-content">
+                    <div class="section-header">
+                        <h3>📋 Letzte Aktivitäten</h3>
+                        <p>Chronologische Übersicht aller Verkäufe und Zahlungen</p>
+                    </div>
+                    <div id="activityContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2 id="confirmTitle">Bestätigung</h2>
+                <span class="close" onclick="cancelAction()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage">Sind Sie sicher?</p>
+                <div class="form-actions">
+                    <button class="btn btn-secondary" onclick="cancelAction()">Abbrechen</button>
+                    <button class="btn btn-danger" onclick="confirmAction()">Bestätigen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Lädt...</p>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
 
     <script src="credentials.js"></script>
     <script src="app.js"></script>
