@@ -137,10 +137,10 @@ function displayOrders() {
         card.innerHTML = `
             <div class="order-header">
                 <div class="order-title">${order.name}</div>
-                <div class="order-date">${new Date(order.createdAt).toLocaleDateString()}</div>
+                <div class="order-date">${new Date(order.created_at).toLocaleDateString()}</div>
             </div>
             <div class="order-info">
-                <p><strong>Einkaufspreis:</strong> ${order.costPrice.toFixed(2)}€/Stück</p>
+                <p><strong>Einkaufspreis:</strong> ${order.cost_price.toFixed(2)}€/Stück</p>
                 <p><strong>Kunden:</strong> ${order.customers ? order.customers.length : 0}</p>
             </div>
             <div class="order-stats">
@@ -163,9 +163,9 @@ function displayOrders() {
             </div>
             <div class="order-progress">
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${(stats.totalSold / order.initialQuantity * 100)}%"></div>
+                    <div class="progress-fill" style="width: ${(stats.totalSold / order.initial_quantity * 100)}%"></div>
                 </div>
-                <span class="progress-text">${Math.round(stats.totalSold / order.initialQuantity * 100)}% verkauft</span>
+                <span class="progress-text">${Math.round(stats.totalSold / order.initial_quantity * 100)}% verkauft</span>
             </div>
         `;
         
@@ -175,9 +175,9 @@ function displayOrders() {
 
 function calculateOrderStats(order) {
     const totalSold = order.sales ? order.sales.reduce((sum, sale) => sum + sale.quantity, 0) : 0;
-    const currentStock = order.initialQuantity - totalSold;
+    const currentStock = order.initial_quantity - totalSold;
     const totalRevenue = order.sales ? order.sales.reduce((sum, sale) => sum + (sale.quantity * sale.pricePerUnit), 0) : 0;
-    const totalCost = totalSold * order.costPrice;
+    const totalCost = totalSold * order.cost_price;
     const totalProfit = totalRevenue - totalCost;
     const totalDebt = calculateTotalDebt(order);
     const totalPaid = order.payments ? order.payments.reduce((sum, payment) => sum + payment.amount, 0) : 0;
@@ -233,13 +233,12 @@ async function createOrder() {
 
     const newOrder = {
         name: name,
-        initialQuantity: quantity,
-        costPrice: costPrice,
+        initial_quantity: quantity,
+        cost_price: costPrice,
         customers: [],
         sales: [],
         payments: [],
-        createdAt: new Date().toISOString(),
-        createdBy: currentUser.username
+        created_by: currentUser.username
     };
 
     showLoading();
@@ -275,6 +274,15 @@ function openOrderDetail(order) {
     updateOrderDetailDisplay();
     document.getElementById('orderDetailModal').style.display = 'block';
     switchTab('overview');
+    
+    // Admin-Bereich anzeigen falls Admin
+    if (currentUser.isAdmin) {
+        document.getElementById('adminDangerZone').style.display = 'block';
+        document.getElementById('deleteOrderBtn').style.display = 'block';
+    } else {
+        document.getElementById('adminDangerZone').style.display = 'none';
+        document.getElementById('deleteOrderBtn').style.display = 'none';
+    }
 }
 
 function updateOrderDetailDisplay() {
@@ -291,15 +299,6 @@ function updateOrderDetailDisplay() {
     document.getElementById('overviewSold').textContent = stats.totalSold + ' Stück';
     document.getElementById('overviewRevenue').textContent = stats.totalRevenue.toFixed(2) + '€';
     document.getElementById('overviewProfit').textContent = stats.totalProfit.toFixed(2) + '€';
-    
-    // ADMIN BUTTONS ANZEIGEN
-    if (currentUser && currentUser.isAdmin) {
-        document.getElementById('adminDangerZone').style.display = 'block';
-        document.getElementById('deleteOrderBtn').style.display = 'block';
-    } else {
-        document.getElementById('adminDangerZone').style.display = 'none';
-        document.getElementById('deleteOrderBtn').style.display = 'none';
-    }
     
     displayCustomers();
     displaySales();
@@ -617,7 +616,7 @@ async function saveCurrentOrder() {
     
     showLoading();
     try {
-        const response = await fetch(`${SERVER_URL}/api/orders/${currentOrder._id}`, {
+        const response = await fetch(`${SERVER_URL}/api/orders/${currentOrder.id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
@@ -627,7 +626,7 @@ async function saveCurrentOrder() {
 
         if (response.ok) {
             const updatedOrder = await response.json();
-            const index = orders.findIndex(o => o._id === currentOrder._id);
+            const index = orders.findIndex(o => o.id === currentOrder.id);
             if (index !== -1) {
                 orders[index] = updatedOrder;
                 currentOrder = updatedOrder;
@@ -673,12 +672,12 @@ async function deleteOrder() {
         async () => {
             showLoading();
             try {
-                const response = await fetch(`${SERVER_URL}/api/orders/${currentOrder._id}`, {
+                const response = await fetch(`${SERVER_URL}/api/orders/${currentOrder.id}`, {
                     method: 'DELETE'
                 });
 
                 if (response.ok) {
-                    orders = orders.filter(o => o._id !== currentOrder._id);
+                    orders = orders.filter(o => o.id !== currentOrder.id);
                     displayOrders();
                     closeModal('orderDetailModal');
                     showToast('Bestellung erfolgreich gelöscht!', 'success');
