@@ -32,7 +32,8 @@ function login() {
     if (users[username] && users[username].password === password) {
         currentUser = {
             username: username,
-            isAdmin: username === 'admin'
+            isAdmin: username === 'admin',
+            role: users[username].role
         };
         handleLoginSuccess();
     } else {
@@ -114,7 +115,20 @@ function displayOrders() {
     const grid = document.getElementById('ordersGrid');
     grid.innerHTML = '';
 
-    if (orders.length === 0) {
+    // Filter basierend auf Rolle
+    let filteredOrders = orders;
+    if (currentUser.role === 'user') {
+        filteredOrders = orders.filter(order => order.created_by === currentUser.username);
+    } else if (currentUser.role === 'creator') {
+        filteredOrders = orders.filter(order => 
+            order.created_by === currentUser.username || 
+            order.created_by === 'Tommy' || 
+            order.created_by === 'Letezia'
+        );
+    }
+    // Admin: alle
+
+    if (filteredOrders.length === 0) {
         grid.innerHTML = `
             <div class="empty-state">
                 <h3>Noch keine Bestellungen vorhanden</h3>
@@ -125,7 +139,7 @@ function displayOrders() {
         return;
     }
 
-    orders.forEach(order => {
+    filteredOrders.forEach(order => {
         const stats = calculateOrderStats(order);
         const card = document.createElement('div');
         card.className = 'order-card';
@@ -133,6 +147,8 @@ function displayOrders() {
         
         const profitClass = stats.totalProfit >= 0 ? 'profit-positive' : 'profit-negative';
         const stockClass = stats.currentStock <= 5 ? 'stock-low' : 'stock-normal';
+        
+        const canEdit = currentUser.isAdmin || order.created_by === currentUser.username;
         
         card.innerHTML = `
             <div class="order-header">
@@ -167,10 +183,42 @@ function displayOrders() {
                 </div>
                 <span class="progress-text">${Math.round(stats.totalSold / order.initial_quantity * 100)}% verkauft</span>
             </div>
+            ${canEdit ? '<button class="btn btn-danger" onclick="deleteOrderFromList(' + order.id + ')">🗑️ Löschen</button>' : ''}
         `;
         
         grid.appendChild(card);
     });
+}
+
+function deleteOrderFromList(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    if (!order || (!currentUser.isAdmin && order.created_by !== currentUser.username)) return;
+    
+    showConfirmModal(
+        'Bestellung löschen',
+        `Möchten Sie die Bestellung "${order.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden!`,
+        async () => {
+            showLoading();
+            try {
+                const response = await fetch(`${SERVER_URL}/api/orders/${orderId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    orders = orders.filter(o => o.id !== orderId);
+                    displayOrders();
+                    showToast('Bestellung erfolgreich gelöscht!', 'success');
+                } else {
+                    throw new Error('Server-Fehler');
+                }
+            } catch (error) {
+                console.error('Fehler beim Löschen:', error);
+                showToast('Fehler beim Löschen der Bestellung', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+    );
 }
 
 function calculateOrderStats(order) {
@@ -275,8 +323,8 @@ function openOrderDetail(order) {
     document.getElementById('orderDetailModal').style.display = 'block';
     switchTab('overview');
     
-    // Admin-Bereich anzeigen falls Admin
-    if (currentUser.isAdmin) {
+    // Admin-Bereich anzeigen falls Admin oder Ersteller
+    if (currentUser.isAdmin || order.created_by === currentUser.username) {
         document.getElementById('adminDangerZone').style.display = 'block';
         document.getElementById('deleteOrderBtn').style.display = 'block';
     } else {
@@ -664,7 +712,7 @@ function cancelAction() {
 }
 
 async function deleteOrder() {
-    if (!currentOrder || !currentUser.isAdmin) return;
+    if (!currentOrder || !currentUser.isAdmin && currentOrder.created_by !== currentUser.username) return;
     
     showConfirmModal(
         'Bestellung löschen',
