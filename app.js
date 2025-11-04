@@ -97,6 +97,7 @@ async function loadOrders() {
         if (response.ok) {
             orders = await response.json();
             displayOrders();
+            displayDebts();
             showToast('Bestellungen erfolgreich geladen', 'success');
         } else {
             throw new Error('Server-Fehler');
@@ -105,6 +106,7 @@ async function loadOrders() {
         console.error('Fehler beim Laden der Bestellungen:', error);
         orders = [];
         displayOrders();
+        displayDebts();
         showToast('Fehler beim Laden der Bestellungen', 'error');
     } finally {
         hideLoading();
@@ -115,10 +117,13 @@ function displayOrders() {
     const grid = document.getElementById('ordersGrid');
     grid.innerHTML = '';
 
-    // Filter basierend auf Rolle
     let filteredOrders = orders;
     if (currentUser.role === 'user') {
-        filteredOrders = orders.filter(order => order.created_by === currentUser.username);
+        filteredOrders = orders.filter(order => 
+            order.created_by === currentUser.username || 
+            order.created_by === 'Robin' || 
+            (order.created_by === 'Tommy' || order.created_by === 'Letezia')
+        );
     } else if (currentUser.role === 'creator') {
         filteredOrders = orders.filter(order => 
             order.created_by === currentUser.username || 
@@ -126,7 +131,6 @@ function displayOrders() {
             order.created_by === 'Letezia'
         );
     }
-    // Admin: alle
 
     if (filteredOrders.length === 0) {
         grid.innerHTML = `
@@ -148,7 +152,8 @@ function displayOrders() {
         const profitClass = stats.totalProfit >= 0 ? 'profit-positive' : 'profit-negative';
         const stockClass = stats.currentStock <= 5 ? 'stock-low' : 'stock-normal';
         
-        const canEdit = currentUser.isAdmin || order.created_by === currentUser.username;
+        const canEdit = currentUser.isAdmin || order.created_by === currentUser.username || 
+                        (currentUser.role === 'user' && (order.created_by === 'Tommy' || order.created_by === 'Letezia'));
         
         card.innerHTML = `
             <div class="order-header">
@@ -192,7 +197,8 @@ function displayOrders() {
 
 function deleteOrderFromList(orderId) {
     const order = orders.find(o => o.id === orderId);
-    if (!order || (!currentUser.isAdmin && order.created_by !== currentUser.username)) return;
+    if (!order || (!currentUser.isAdmin && order.created_by !== currentUser.username && 
+        !(currentUser.role === 'user' && (order.created_by === 'Tommy' || order.created_by === 'Letezia')))) return;
     
     showConfirmModal(
         'Bestellung löschen',
@@ -323,8 +329,8 @@ function openOrderDetail(order) {
     document.getElementById('orderDetailModal').style.display = 'block';
     switchTab('overview');
     
-    // Admin-Bereich anzeigen falls Admin oder Ersteller
-    if (currentUser.isAdmin || order.created_by === currentUser.username) {
+    if (currentUser.isAdmin || order.created_by === currentUser.username || 
+        (currentUser.role === 'user' && (order.created_by === 'Tommy' || order.created_by === 'Letezia'))) {
         document.getElementById('adminDangerZone').style.display = 'block';
         document.getElementById('deleteOrderBtn').style.display = 'block';
     } else {
@@ -712,7 +718,8 @@ function cancelAction() {
 }
 
 async function deleteOrder() {
-    if (!currentOrder || !currentUser.isAdmin && currentOrder.created_by !== currentUser.username) return;
+    if (!currentOrder || (!currentUser.isAdmin && order.created_by !== currentUser.username && 
+        !(currentUser.role === 'user' && (order.created_by === 'Tommy' || order.created_by === 'Letezia')))) return;
     
     showConfirmModal(
         'Bestellung löschen',
@@ -885,4 +892,59 @@ function displayRecentActivity() {
             `).join('')}
         </div>
     `;
+}
+
+function displayDebts() {
+    if (currentUser.role !== 'creator') return;
+    
+    const debtsList = document.getElementById('debtsList');
+    debtsList.innerHTML = '';
+    
+    const adminOrders = orders.filter(order => order.created_by === 'admin');
+    const userDebts = [];
+    
+    adminOrders.forEach(order => {
+        if (order.customers) {
+            order.customers.forEach(customer => {
+                if (customer.name === currentUser.username) {
+                    const debt = calculateCustomerDebt(customer);
+                    const paid = calculateCustomerPaid(customer);
+                    const outstanding = debt - paid;
+                    if (outstanding > 0) {
+                        userDebts.push({
+                            orderName: order.name,
+                            outstanding: outstanding
+                        });
+                    }
+                }
+            });
+        }
+    });
+    
+    if (userDebts.length === 0) {
+        debtsList.innerHTML = '<div class="empty-state"><p>Keine offenen Schulden vorhanden.</p></div>';
+        return;
+    }
+    
+    userDebts.forEach(debt => {
+        const item = document.createElement('div');
+        item.className = 'debt-item';
+        item.innerHTML = `
+            <div class="debt-info">
+                <strong>Bestellung: ${debt.orderName}</strong>
+                <div class="debt-amount">Offene Schulden: ${debt.outstanding.toFixed(2)}€</div>
+            </div>
+        `;
+        debtsList.appendChild(item);
+    });
+}
+
+function showDebts() {
+    document.getElementById('ordersContainer').style.display = 'none';
+    document.getElementById('debtsSection').style.display = 'block';
+}
+
+function showOrders() {
+    document.getElementById('ordersContainer').style.display = 'block';
+    document.getElementById('debtsSection').style.display = 'none';
 }
