@@ -80,6 +80,28 @@ body {
     z-index: 100;
 }
 
+.debts-section {
+    padding: 20px;
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    margin: 20px;
+}
+
+.debt-item {
+    background: #f8f9fa;
+    padding: 20px;
+    margin-bottom: 15px;
+    border-radius: var(--border-radius);
+    border-left: 3px solid var(--danger);
+}
+
+.debt-amount {
+    color: var(--danger);
+    font-weight: bold;
+    margin-top: 5px;
+}
+
 .orders-container {
     padding: 0 20px 20px;
 }
@@ -652,6 +674,16 @@ body {
         height: 100%;
         margin: 0;
         border-radius: 0;
+        overflow-y: auto;
+    }
+    
+    .modal {
+        padding: 0;
+        cursor: pointer;
+    }
+    
+    .modal-content {
+        cursor: default;
     }
     
     .tabs {
@@ -674,7 +706,6 @@ body {
         gap: 5px;
     }
 }
-
 
 .admin-danger-zone {
     background: #fff5f5;
