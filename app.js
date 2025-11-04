@@ -330,12 +330,22 @@ function openOrderDetail(order) {
     switchTab('overview');
     
     // Bearbeiten nur für eigene Bestellungen oder Admin
-    if (currentUser.isAdmin || order.created_by === currentUser.username) {
+    const canEdit = currentUser.isAdmin || order.created_by === currentUser.username;
+    if (canEdit) {
         document.getElementById('adminDangerZone').style.display = 'block';
         document.getElementById('deleteOrderBtn').style.display = 'block';
     } else {
         document.getElementById('adminDangerZone').style.display = 'none';
         document.getElementById('deleteOrderBtn').style.display = 'none';
+    }
+    
+    // Buttons ausblenden, wenn nicht bearbeitbar
+    if (!canEdit) {
+        const buttons = document.querySelectorAll('button[onclick="addCustomer()"], button[onclick="addSale()"], button[onclick="addPayment()"]');
+        buttons.forEach(btn => btn.style.display = 'none');
+    } else {
+        const buttons = document.querySelectorAll('button[onclick="addCustomer()"], button[onclick="addSale()"], button[onclick="addPayment()"]');
+        buttons.forEach(btn => btn.style.display = 'inline-block');
     }
 }
 
@@ -413,6 +423,8 @@ function displayCustomers() {
         return;
     }
 
+    const canEdit = currentUser.isAdmin || currentOrder.created_by === currentUser.username;
+
     currentOrder.customers.forEach(customer => {
         const debt = calculateCustomerDebt(customer);
         const paid = calculateCustomerPaid(customer);
@@ -428,7 +440,7 @@ function displayCustomers() {
                     <span>Schulden: ${outstanding.toFixed(2)}€</span>
                 </div>
             </div>
-            <button class="btn btn-danger" onclick="removeCustomer(${customer.id})">Löschen</button>
+            ${canEdit ? '<button class="btn btn-danger" onclick="removeCustomer(' + customer.id + ')">Löschen</button>' : ''}
         `;
         list.appendChild(item);
     });
@@ -515,6 +527,8 @@ function displaySales() {
         return;
     }
 
+    const canEdit = currentUser.isAdmin || currentOrder.created_by === currentUser.username;
+
     currentOrder.sales.forEach(sale => {
         const item = document.createElement('div');
         item.className = 'sale-item';
@@ -526,7 +540,7 @@ function displaySales() {
                     <span>${new Date(sale.date).toLocaleDateString()}</span>
                 </div>
             </div>
-            <button class="btn btn-danger" onclick="removeSale(${sale.id})">Löschen</button>
+            ${canEdit ? '<button class="btn btn-danger" onclick="removeSale(' + sale.id + ')">Löschen</button>' : ''}
         `;
         list.appendChild(item);
     });
@@ -595,6 +609,8 @@ function displayPayments() {
         return;
     }
 
+    const canEdit = currentUser.isAdmin || currentOrder.created_by === currentUser.username;
+
     currentOrder.payments.forEach(payment => {
         const item = document.createElement('div');
         item.className = 'customer-item';
@@ -606,7 +622,7 @@ function displayPayments() {
                     <span>${new Date(payment.date).toLocaleDateString()}</span>
                 </div>
             </div>
-            <button class="btn btn-danger" onclick="removePayment(${payment.id})">Löschen</button>
+            ${canEdit ? '<button class="btn btn-danger" onclick="removePayment(' + payment.id + ')">Löschen</button>' : ''}
         `;
         list.appendChild(item);
     });
