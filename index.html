@@ -32,13 +32,23 @@
                 <h1>📦 Inventar Management</h1>
                 <p>Verwalten Sie Ihre Bestellungen und Kunden effizient</p>
             </div>
-            <button class="btn" onclick="showNewOrderModal()">+ Neue Bestellung</button>
+            <div>
+                <button class="btn" onclick="showNewOrderModal()">+ Neue Bestellung</button>
+                <button class="btn" onclick="showDebts()" id="debtsBtn" style="display: none;">Meine Schulden</button>
+                <button class="btn" onclick="showOrders()">Bestellungen</button>
+            </div>
         </div>
 
         <button class="btn btn-danger logout-btn" onclick="logout()">Ausloggen</button>
 
+        <!-- Schulden Section -->
+        <div class="debts-section" id="debtsSection" style="display: none;">
+            <h2>💰 Meine Schulden</h2>
+            <div id="debtsList"></div>
+        </div>
+
         <!-- Orders Grid -->
-        <div class="orders-container">
+        <div class="orders-container" id="ordersContainer">
             <div id="ordersGrid" class="orders-grid"></div>
         </div>
     </div>
