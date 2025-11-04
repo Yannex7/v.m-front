@@ -329,8 +329,8 @@ function openOrderDetail(order) {
     document.getElementById('orderDetailModal').style.display = 'block';
     switchTab('overview');
     
-    if (currentUser.isAdmin || order.created_by === currentUser.username || 
-        (currentUser.role === 'user' && (order.created_by === 'Tommy' || order.created_by === 'Letezia'))) {
+    // Bearbeiten nur für eigene Bestellungen oder Admin
+    if (currentUser.isAdmin || order.created_by === currentUser.username) {
         document.getElementById('adminDangerZone').style.display = 'block';
         document.getElementById('deleteOrderBtn').style.display = 'block';
     } else {
@@ -718,8 +718,7 @@ function cancelAction() {
 }
 
 async function deleteOrder() {
-    if (!currentOrder || (!currentUser.isAdmin && order.created_by !== currentUser.username && 
-        !(currentUser.role === 'user' && (order.created_by === 'Tommy' || order.created_by === 'Letezia')))) return;
+    if (!currentOrder || (!currentUser.isAdmin && order.created_by !== currentUser.username)) return;
     
     showConfirmModal(
         'Bestellung löschen',
